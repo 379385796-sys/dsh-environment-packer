@@ -1,8 +1,8 @@
-# Upgrade and rollback — candidate only
+# Upgrade and rollback
 
-0.4.2 is prepared for review, not authorized for production installation or GitHub Release in this task. Formal 0.4.1 and its Junction target remain unchanged. Do not overwrite the existing public 0.4.1 Release.
+Use the exact reviewed v0.4.2 artifact and checksum. Preserve the prior 0.4.1 source, installation list and rollback materials. Never overwrite the existing public 0.4.1 Release.
 
-After separate authorization: normally exit DSH completely, verify installed 0.4.1, Junction target and file hashes against the recorded baseline, back up plugin source/history and installation records with private ACLs, and verify the exact approved 0.4.2 tgz checksum. Stop on any conflict. Preserve the Junction and deploy only the reviewed file list; never overwrite a whole Profile or resolve unrelated plugins.
+Normally exit DSH completely, verify installed 0.4.1, Junction target and file hashes against the recorded baseline, back up plugin source/history and installation records with private ACLs, and verify the exact approved 0.4.2 tgz checksum. Stop on any conflict. Preserve the Junction and deploy only the reviewed file list; never overwrite a whole Profile or resolve unrelated plugins.
 
 GUI behavior changes: running full backup removed, retired /create-full returns 410, manual normal exit and assistant confirmation/process detection are mandatory. Existing plugin config is not migrated or rewritten. Safe export remains an expert compatibility endpoint, outside the main GUI. Verify cold-only UI, cancellation, handoff, strict exit gate, native path handling and a synthetic restore before any real private backup.
 

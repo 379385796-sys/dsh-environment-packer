@@ -36,7 +36,7 @@ window.__ModuleLoader__.load({
         h('button',{type:'button',disabled:busy,onClick:()=>go(false),style:{padding:'11px 18px',fontWeight:600,borderRadius:8,background:'#1f6f5c',color:'white',border:0,cursor:busy?'wait':'pointer'}},busy?'正在准备…':'创建完整环境备份（离线）'),
         h('div',{role:'status','aria-live':'polite',style:{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.6}},message),
         fallback?h('div',null,h('label',null,'原生窗口不可用时的完整 ZIP 路径：',h('input',{value:target,disabled:busy,onChange:e=>setTarget(e.target.value),placeholder:'D:\\Backups\\private.zip',style:{width:'100%',boxSizing:'border-box'}})),h('button',{disabled:busy||!target.trim(),onClick:()=>go(true)},'使用此路径并继续确认')):null,
-        h('p',{style:{margin:0,fontSize:12,opacity:.7,lineHeight:1.6}},'0.4.2 候选。先保存工作，再确认本次私人备份。当前 Desktop 需手动正常退出；助手不强杀进程，不自动重启 DSH。仅包含当前 Profile 及已声明的 home 状态，外部数据库和写入程序也须停止；外部工作区、模型、系统凭据与运行时不包含。'),
+        h('p',{style:{margin:0,fontSize:12,opacity:.7,lineHeight:1.6}},'0.4.2。先保存工作，再确认本次私人备份。当前 Desktop 需手动正常退出；助手不强杀进程，不自动重启 DSH。仅包含当前 Profile 及已声明的 home 状态，外部数据库和写入程序也须停止；外部工作区、模型、系统凭据与运行时不包含。'),
         h('p',{style:{margin:0,fontSize:12,opacity:.7}},'恢复只写全新兼容环境。ZIP 校验通过不等于已证明恢复运行。安全配置导出仅保留专家兼容接口，不能恢复完整环境。')
       );
     }

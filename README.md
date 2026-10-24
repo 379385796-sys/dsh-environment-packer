@@ -1,8 +1,8 @@
-# DSH Environment Packer 0.4.2 候选
+# DSH Environment Packer 0.4.2
 
 [English](README.en.md) · [兼容范围](docs/COMPATIBILITY.md) · [恢复](docs/RESTORE.md) · [来源与许可](docs/PROVENANCE.md)
 
-面向重装、迁移和灾难恢复的低频本地离线冷备份工具。当前为供审阅的候选，尚未升级正式 0.4.1，也未发布 0.4.2 Release。不是所有 DSH 环境通用的一键无损迁移器。
+面向重装、迁移和灾难恢复的低频本地离线冷备份工具。从 [v0.4.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.2) 下载 tgz 和 SHA-256 文件，核对后通过 DSH 本地插件安装功能安装。不是所有 DSH 环境通用的一键无损迁移器。
 
 ## 创建完整环境备份（离线）
 
@@ -22,7 +22,7 @@
 
 **ZIP 可能包含 API Key、Token、密码、私人 Prompt、会话、记忆和附件。ZIP 没有加密，仅本地保存，不适合公开分享。** 不上传云端；不要将 ZIP、配置或任务私有记录附在 issue。
 
-范围：当前 Profile 全部常规文件和目录，包括插件、依赖和本地 tgz；安装包根链接物化，循环或数据链接安全失败。另包含所选 DSH_HOME 的 storages、sessions、attachments、memory、skills、AGENTS.md、.credentials.yaml/.yml（存在时）。清单记录实际范围、逐文件哈希及排除。
+GUI 要求 Profile 位于所选 DSH_HOME/profiles/<name>，非标准外置 Profile 会安全拒绝。范围：当前 Profile 全部常规文件和目录，包括插件、依赖和本地 tgz；安装包根链接物化，循环或数据链接安全失败。另包含所选 DSH_HOME 的 storages、sessions、attachments、memory、skills、AGENTS.md、.credentials.yaml/.yml（存在时）。清单记录实际范围、逐文件哈希及排除。
 
 不包含其他 Profile、未声明的 home 项、外部工作区/模型/程序、系统或浏览器凭据、运行时、原 ACL/所有者/ADS。外部数据库和其他写入程序须正常停止；不保证外部状态被迁移。助手会保守等待同一 Desktop 运行时的所有实例、已跟踪后代、引用源 home 的进程及已知数据库进程。文件读锁失败就停止。
 
@@ -44,8 +44,8 @@ Windows 私人 ACL 仅限当前用户/SYSTEM；这不是加密。任务参数、
 - 第二台机器/VM、真实私人数据库业务恢复、网络盘/OneDrive、所有杀软/DPI/外部依赖未验证。哈希不是签名。
 - 普通失败/协作取消清理本次临时文件；强制结束、断电或系统崩溃可能留私有临时文件/任务锁，也存在 ZIP 原子提交与成功状态写入之间的短窗口。没有明确成功状态的产物一律视为未确认，先保留检查，不能当作完成备份。不会自动删除历史材料。
 
-## 构建、候选安装与许可
+## 构建、安装与许可
 
-见 [构建测试](docs/BUILD-TEST.md) 和 [升级回滚](docs/UPGRADE-ROLLBACK.md)。只安装核对 SHA-256 后的候选 tgz 到隔离测试 Profile；正式升级和 GitHub Release 需要后续明确授权。保持 private:true，不发布 npm。
+见 [构建测试](docs/BUILD-TEST.md) 和 [升级回滚](docs/UPGRADE-ROLLBACK.md)。先在隔离 Profile 验证；正式升级前正常退出 DSH、备份 Packer，并按白名单部署。不要覆盖整个 Profile。保持 private:true，不发布 npm。
 
 维护者可授权的贡献沿用 [MIT](LICENSE)；js-yaml 原作者及 MIT 保留：[第三方声明](THIRD_PARTY_NOTICES.md)。早期来源记录不完整的披露不变；新增助手没有引入 npm/二进制依赖。

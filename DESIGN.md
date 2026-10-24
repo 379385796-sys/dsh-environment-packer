@@ -1,4 +1,4 @@
-# Cold-backup design, 0.4.2 candidate
+# Cold-backup design, 0.4.2
 
 The sole ordinary GUI operation selects a ZIP, obtains native per-task confirmation and starts a short Windows PowerShell bootstrap. It uses Start-Process to create the independent WinForms assistant without shared DSH pipes or IPC. A private UUID task, exclusive per-home lock and ready/accepted handshake must complete before the UI advises quitting. A direct Node detached PowerShell 5.1 launch silently exited in local probing; it is not used.
 

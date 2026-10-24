@@ -1,21 +1,25 @@
-# v0.4.1
+# Environment Packer v0.4.2
 
 ## 中文
 
-Environment Packer 首个审查后的公开源码版本。完整私人 ZIP 与范围很小的安全配置导出分开；私人包可能含凭据、Prompt、会话与记忆，不加密，不适合分享。安全导出不能恢复完整环境。
+以完整离线冷备份为主要流程：选择 ZIP、私人确认、独立助手接管、**用户从菜单/托盘正常退出 DSH**，再点击“我已正常退出，检查后继续”。人工确认不能绕过进程检查；未完全退出、检测不明或超时均不开始。助手显示阶段、活动条和文件数，不自动退出或重启 DSH。
 
-0.4.1 修正无进度回调时返回与落盘恢复计数为 0 的问题，未改变 ZIP 格式、恢复范围、校验或提交逻辑。原生 Save As 由用户在实际 Windows 桌面完成取消、Unicode 路径、已有文件拒绝和安全导出；原生代码未为自动化改写。
+普通热备份 GUI 已移除，POST /create-full 返回 410。保留专家安全导出（不能恢复环境）和离线 CLI。Windows 载荷读锁、持续监测、完整清单/CRC/SHA-256 校验与无覆盖提交保护本地 ZIP。
 
-恢复只写新 DSH_HOME。数据库一致性需停机冷备份。旧 0.3.4 目录/声明格式不兼容。实测 Windows x64 / DSH Desktop 0.2.1-rc.2 / Electron Node 24.21.0 / ABI 149；未验证跨机、真实私人数据库和全部外部依赖。
+私人 ZIP 可能包含 API Key、Token、密码、私人 Prompt、会话、记忆和附件；**不加密，不适合公开分享，不自动上传**。只包含当前 Profile 和声明的 home 范围；外部运行时/工作区/模型、系统凭据及其他 Profile 不完整迁移。GUI 需标准 DSH_HOME/profiles/<name>。恢复只写全新兼容 home。
 
-本公开 tgz 增加许可与公开说明，SHA 与早期未公开的私人候选不同；功能资源相同。请核对本 Release 的 SHA-256。第三方 js-yaml MIT 保留，维护者授权范围和历史来源限制见仓库说明。不发布 npm 或 dsh-market。
+保留 dsh-private-recovery/2，兼容 0.4.0/0.4.1 私人包；0.3.4 旧格式不兼容。已验证 Windows 11 x64 10.0.26300、DSH Desktop 0.2.1-rc.2、Electron Node 24.21.0 / ABI 149。单文件 128 MiB、约 2 GiB 载荷、59,999 项限制。跨机器/真实私人数据库业务恢复、全部外部依赖/杀软/DPI/网络盘未普遍验证。ZIP 校验不等于业务恢复，哈希不是签名。硬退出/断电可能留下私有残留或未确认结果。
+
+发布包更新文档和“候选”显示标识，运行流程及助手/恢复核心与提交 4a797b11c070b53f7eadc1ccbea032155bce65ad 相同。其字节与旧 555e90… 候选不同，请使用本 Release 附带的完整校验值。MIT 授权范围、js-yaml 原作者与许可、PROVENANCE 早期来源披露保留。不发布 npm，不提交 dsh-market。
 
 ## English
 
-First reviewed public snapshot. Full private backup and conservative safe export remain distinct. Private ZIPs may contain credentials, prompts, sessions and memory: they are not encrypted or suitable for public sharing. Safe export cannot restore an environment.
+Complete offline cold backup is now the main workflow: choose a new ZIP, approve private scope, wait for assistant handoff, **manually quit DSH through its menu/tray**, then confirm in the assistant. Confirmation cannot bypass process inspection. Unknown/live writers or timeout stop the job. The independent window displays phases, an activity bar and file counts; it neither quits nor restarts DSH automatically.
 
-0.4.1 fixes callback-free restore counters and the written result report without changing extraction, verification, format or scope. Native Save As passed actual human desktop interactions; production dialog code was not rewritten for automation.
+The ordinary hot-backup GUI is removed and POST /create-full returns 410. Narrow expert safe export cannot restore an environment; the offline CLI remains. Windows source read leases, restart monitoring, manifest/CRC/payload SHA-256 verification and no-replace commit protect the archive.
 
-Restore only into a fresh home; cold backups are required for database consistency. Legacy 0.3.4 formats are incompatible. Tested on Windows x64, DSH Desktop 0.2.1-rc.2 and its Electron Node 24.21.0 / ABI 149. Another machine, real private database restoration and all external dependencies were not tested.
+Private ZIPs may contain credentials, prompts, conversations, memories and attachments. **They are unencrypted, local-only and unsuitable for public sharing.** Scope is the selected standard Profile and declared home entries, not a universal migration of external runtimes, workspaces, models or OS credentials. Restore accepts only a fresh compatible home.
 
-The public package adds licensing/documentation and differs in hash from earlier unpublished candidates while preserving functional resources. Verify this Release's checksum. js-yaml retains its MIT notice; license scope and incomplete historical provenance are documented. No npm or market publication.
+Format recovery/2 remains compatible with 0.4.0/0.4.1; legacy 0.3.4 formats are unsupported. Tested Windows 11 x64 build 10.0.26300, Desktop 0.2.1-rc.2, Electron Node 24.21.0 / ABI 149. Limits: 128 MiB/file, about 2 GiB payload, 59,999 entries. Cross-machine and real private database business restoration are not generally validated. Verification does not prove business operation, and hashes are not signatures. Hard exits can leave private residues or unconfirmed results.
+
+Release packaging updates documentation and the visible candidate label only; backup/assistant/restore behavior matches reviewed commit 4a797b1. The artifact differs from the earlier 555e90… candidate: verify this Release's checksum. Scoped MIT, original js-yaml notices and provenance disclosures remain. No npm or marketplace publication.

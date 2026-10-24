@@ -1,8 +1,8 @@
-# DSH Environment Packer 0.4.2 candidate
+# DSH Environment Packer 0.4.2
 
 [中文](README.md) · [Compatibility](docs/COMPATIBILITY.md) · [Restore](docs/RESTORE.md) · [Provenance](docs/PROVENANCE.md)
 
-A local offline cold-backup tool for infrequent migration, reinstallation and disaster recovery. This is a review candidate, not a published 0.4.2 Release. Production 0.4.1 remains unchanged. It does not promise universal lossless migration.
+A local offline cold-backup tool for infrequent migration, reinstallation and disaster recovery. Download the tgz and SHA-256 file from [v0.4.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.2), verify it, then use the DSH local plugin installer. It does not promise universal lossless migration.
 
 ## Desktop workflow
 
@@ -16,7 +16,7 @@ The independent window displays waiting, verified exit, scanning, writing, verif
 
 **Private ZIPs can contain API keys, tokens, passwords, private prompts, conversations, memories and attachments. ZIPs are not encrypted and must not be shared publicly.** Local only; no cloud upload. Windows private ACLs are not encryption.
 
-Includes the selected Profile's regular files, plugins, installed dependencies and local packages; package-root installation links are materialized, other/cyclic links fail. Declared home scope: storages, sessions, attachments, memory, skills, AGENTS.md and .credentials.yaml/.yml. Other Profiles, undeclared home entries, external workspaces/models/programs, runtime, OS/browser credentials and original filesystem metadata are excluded. Stop external databases and other writers; external state is not guaranteed to migrate.
+The GUI requires a Profile under the selected DSH_HOME/profiles/<name>; nonstandard external Profiles are refused. Includes the selected Profile's regular files, plugins, installed dependencies and local packages; package-root installation links are materialized, other/cyclic links fail. Declared home scope: storages, sessions, attachments, memory, skills, AGENTS.md and .credentials.yaml/.yml. Other Profiles, undeclared home entries, external workspaces/models/programs, runtime, OS/browser credentials and original filesystem metadata are excluded. Stop external databases and other writers; external state is not guaranteed to migrate.
 
 The assistant conservatively waits for all instances using the Desktop runtime, tracked descendants, processes referencing the source home and known database processes. Private task parameters and payload path requests remain under a protected task directory. Ordinary status contains phases, counts, booleans and controlled error codes. Historical task records under DSH_HOME/.packer-cold are excluded from backups.
 
@@ -30,4 +30,4 @@ dsh-private-recovery/2 is unchanged: 0.4.0/0.4.1 private archives remain compati
 
 Ordinary errors/cooperative cancellation clean the current staging. Hard exits or power loss can leave private temporary files or locks; an atomic ZIP commit can precede its success record. Treat any unacknowledged output as unconfirmed. Preserve and inspect residues; no broad automatic deletion.
 
-Build and isolated candidate installation: [instructions](docs/BUILD-TEST.md). Production upgrade and GitHub Release require separate approval. No npm publication. The scoped MIT grant, js-yaml author/license and historical provenance disclosure remain intact. New assistant sources add no bundled runtime, binary or npm dependency.
+Build and isolated installation: [instructions](docs/BUILD-TEST.md). Before production upgrade, quit normally, back up the plugin and preserve existing Junctions. Never overwrite an entire Profile. No npm publication. The scoped MIT grant, js-yaml author/license and historical provenance disclosure remain intact. New assistant sources add no bundled runtime, binary or npm dependency.

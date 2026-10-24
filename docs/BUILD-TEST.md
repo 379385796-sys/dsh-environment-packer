@@ -1,9 +1,9 @@
-# Build and test the 0.4.2 candidate
+# Build and test 0.4.2
 
 No runtime npm installation is required. js-yaml is vendored with its original MIT notice; new helpers use existing Windows, PowerShell, WinForms and Node APIs. No install hooks or downloaded executable are added.
 
 Use Windows and the matching DSH runtime. Explicitly set TEMP, TMP and DSH_PACKER_TEST_ROOT to an existing scratch directory before tests; never point them at a real Profile. Run tests/smoke.mjs, tests/cold-safety.mjs and tests/cold-component.mjs. The component test opens synthetic assistant windows and checks handoff, premature confirmation, timeout, cancellation, privacy and ACLs; it does not substitute for actual Desktop interaction. Tests/legacy-private-acceptance.mjs contains the broader synthetic integrity/recovery regression. tests/cold-parent.mjs is a subprocess fixture, not an entry point for ordinary use.
 
-Build with npm pack --ignore-scripts --pack-destination <OUTPUT_DIRECTORY>. Keep the exact tgz SHA-256 alongside it. Inspect the archive's actual whitelist, license files and unpacked bytes, then run smoke/safety tests against the extracted code. private:true intentionally prevents npm publish. Candidates and the published 0.4.1 artifact have different hashes; never overwrite the existing Release.
+Build with npm pack --ignore-scripts --pack-destination <OUTPUT_DIRECTORY>. Keep the exact tgz SHA-256 alongside it. Inspect the archive's actual whitelist, license files and unpacked bytes, then run smoke/safety tests against the extracted code. private:true intentionally prevents npm publish. Use the checksum of the exact Release artifact. The published 0.4.1 artifact and earlier 0.4.2 candidates have different hashes; never overwrite an existing Release.
 
 Required desktop acceptance: real isolated DSH button → native Save As → native private confirmation → independent assistant handoff → normal manual quit → assistant exit-confirmation button → detected quiescence → verified ZIP → fresh-home restoration → host business startup/restart. Verify both cancellation points, premature confirmation/live writers, duplicates, timeout, existing output, Unicode paths, permission failure, interruption and helper launch failure. Record fault injection and manual checks separately. Do not infer visible progress-window acceptance from a ready file alone.

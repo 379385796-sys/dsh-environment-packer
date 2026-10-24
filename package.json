@@ -1,0 +1,54 @@
+{
+  "name": "dsh-environment-packer",
+  "version": "0.4.1",
+  "private": true,
+  "type": "module",
+  "description": "Private local recovery ZIP with verified isolated restore; conservative safe configuration export.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "lib/*.js",
+    "assets/*.cjs",
+    "bin/*.ps1",
+    "locale/*.json",
+    "icon.svg",
+    "vendor/*.mjs",
+    "vendor/*.LICENSE",
+    "bin/*.mjs",
+    "README.md",
+    "DESIGN.md",
+    "README.en.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "CHANGELOG.md",
+    "docs/*.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/379385796-sys/dsh-environment-packer.git"
+  },
+  "homepage": "https://github.com/379385796-sys/dsh-environment-packer",
+  "bugs": {
+    "url": "https://github.com/379385796-sys/dsh-environment-packer/issues"
+  }
+}

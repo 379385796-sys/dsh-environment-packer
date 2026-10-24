@@ -1,0 +1,12 @@
+node_modules/
+*.tgz
+*.zip
+*.log
+artifacts/
+private-audit/
+backup/
+cache/
+.tmp/
+.env*
+.credentials.*
+.DS_Store

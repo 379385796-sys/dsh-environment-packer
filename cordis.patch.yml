@@ -1,0 +1,3 @@
+- insert:
+    - id: environment-packer
+      name: dsh-environment-packer

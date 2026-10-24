@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Environment recovery pack">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#1f6f5c"/>
+  <path d="M18 22h28v7H18zm0 12h28v8H18z" fill="#e9fbf4"/>
+  <path d="M26 15h12v10H26z" fill="#9fe3c8"/>
+  <path d="M32 45v8m0 0-5-5m5 5 5-5" fill="none" stroke="#e9fbf4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "环境恢复包",
+    "description": "通过 Windows 原生 Save As 对话框，手动导出一个可移植的 DSH 环境恢复 ZIP。"
+  }
+}

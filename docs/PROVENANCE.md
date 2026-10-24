@@ -11,3 +11,5 @@ The root MIT grant applies only to maintainer-controlled copyrightable contribut
 This public repository begins with the reviewed snapshot dated 2026-10-24. Historical private data, audit files and old Git histories were not imported. No initial author, earlier commit sequence or creation date is fabricated.
 
 References: [js-yaml](https://github.com/nodeca/js-yaml), [fixed related-project commit](https://github.com/KLRSL/dsh-packer/tree/709b94747413683d717f930b424b395d6d749667), [MIT](https://opensource.org/license/mit), [Copyright Office distinction between methods and expression](https://www.copyright.gov/circs/circ33.pdf), [GitHub licensing documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
+
+0.4.2 candidate: new independent-assistant sources were developed for this local revision using Windows/Node API documentation. No additional third-party source, dependency or binary is bundled; existing scoped MIT, original js-yaml notice and early-history disclosure are retained.

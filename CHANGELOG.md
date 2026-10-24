@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 — candidate, 2026-10-24
+
+- Replace ordinary hot-backup GUI with one offline cold-backup operation; retire /create-full with HTTP 410.
+- Add independent Windows assistant, acknowledged handoff, private task lock, stage/activity window and explicit manual-exit confirmation. Confirmation never bypasses writer inspection.
+- Require known writers to stop, hold Windows payload read leases, monitor for restarts and check again before no-replace ZIP commit.
+- Reuse recovery/2 and unchanged trusted restore; add streamed archive SHA and cleanup-failure rollback. Keep expert safe export and offline CLI; CLI adds writer checks.
+- Production upgrade and GitHub publication are pending separate authorization.
+
 ## 0.4.1 — 2026-10-24
 
 - Correct restore counters and the written result report when no progress callback is supplied; verification/extraction/commit behavior is unchanged.

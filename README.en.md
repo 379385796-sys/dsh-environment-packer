@@ -1,54 +1,33 @@
-# DSH Environment Packer 0.4.1
+# DSH Environment Packer 0.4.2 candidate
 
-[中文](README.md) · [Compatibility](docs/COMPATIBILITY.md) · [Source provenance](docs/PROVENANCE.md)
+[中文](README.md) · [Compatibility](docs/COMPATIBILITY.md) · [Restore](docs/RESTORE.md) · [Provenance](docs/PROVENANCE.md)
 
-A local DSH backup and isolated restoration plugin, with a separate conservative configuration export. It is not a universal one-click lossless migration tool.
+A local offline cold-backup tool for infrequent migration, reinstallation and disaster recovery. This is a review candidate, not a published 0.4.2 Release. Production 0.4.1 remains unchanged. It does not promise universal lossless migration.
 
-## Privacy boundaries
+## Desktop workflow
 
-**A full private ZIP may contain API keys, tokens, passwords, private prompts, sessions, attachments and memory. The ZIP is not encrypted and is unsuitable for public sharing.** Confirmation is required for each backup; it stays local. Never upload a private ZIP, real Profile or credentials to an issue.
+Click Create complete environment backup (offline), choose a new ZIP with Windows Save As, save unfinished work and approve the private-data warning. Wait for an independent assistant to acknowledge handoff. If handoff fails, keep DSH running.
 
-The full mode preserves the selected Profile's regular files, configuration, installed plugins/dependencies and local packages. Package-root dependency links are materialized; data links and cycles fail closed. Selected home roots: storages, sessions, attachments, memory, skills, AGENTS.md and .credentials.yaml/.yml when present. External workspaces/programs/models, other Profiles, browser/OS credentials, runtimes, original ACLs and NTFS ADS are excluded. The manifest records files, hashes and limitations.
+**Manually quit all DSH instances using the application or tray menu**, then click **I have quit normally; check and continue** in the assistant. The current Desktop exposes no safe plugin API for whole-application quit. Closing a window may only hide it. Human confirmation cannot bypass process checks. No detected exit, uncertain inspection or a ten-minute timeout means no backup.
 
-The safe mode is **not an environment restore**. It exports only counts, smooth-stream.enabled as a boolean, and ui-appearance.fontSize as a finite 8–48 number. Raw configurations, arbitrary strings/identifiers/paths/versions, prompts, documents, sessions, attachments, memory, plugin files and tgz archives are excluded. It does not claim to sanitize arbitrary user files.
+The independent window displays waiting, verified exit, scanning, writing, verification and the final result, with an activity bar and file count rather than invented percentages. Windows read leases deny writes/deletion of every inventoried payload while the archive is generated. Failure to acquire a lease stops the task. Success includes path, size, SHA-256, validation and cleanup. The assistant never restarts DSH automatically.
 
-## Install and use
+## Scope and privacy
 
-Download the tgz and SHA-256 file from [v0.4.1](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.1), verify the hash and select the tgz in DSH's local plugin installer. Restart the host and open Settings → Environment recovery pack. This project is not published to npm; private:true prevents accidental npm publication.
+**Private ZIPs can contain API keys, tokens, passwords, private prompts, conversations, memories and attachments. ZIPs are not encrypted and must not be shared publicly.** Local only; no cloud upload. Windows private ACLs are not encryption.
 
-For an existing link/Junction installation, fully exit DSH and back up the source, link target and file list before deploying verified files. Do not modify a live target or overwrite an entire Profile. See [upgrade/rollback](docs/UPGRADE-ROLLBACK.md).
+Includes the selected Profile's regular files, plugins, installed dependencies and local packages; package-root installation links are materialized, other/cyclic links fail. Declared home scope: storages, sessions, attachments, memory, skills, AGENTS.md and .credentials.yaml/.yml. Other Profiles, undeclared home entries, external workspaces/models/programs, runtime, OS/browser credentials and original filesystem metadata are excluded. Stop external databases and other writers; external state is not guaranteed to migrate.
 
-Choose a mode and an existing output directory. Read and confirm each private backup. Existing ZIPs are refused. Manual directory input remains available if native dialogs are unavailable. Native Save As was exercised by a human on the Windows desktop for cancellation, Unicode paths, no-overwrite and safe export; missing automation enumeration alone does not prove a dialog failed to open.
+The assistant conservatively waits for all instances using the Desktop runtime, tracked descendants, processes referencing the source home and known database processes. Private task parameters and payload path requests remain under a protected task directory. Ordinary status contains phases, counts, booleans and controlled error codes. Historical task records under DSH_HOME/.packer-cold are excluded from backups.
 
-![Private backup](assets/private-backup.png)
+The old full-backup GUI is removed; POST /create-full always returns 410 HOT_BACKUP_DISABLED. The narrow /create safe-export compatibility endpoint remains for experts and **cannot restore an environment**. It excludes raw configurations, arbitrary strings, prompts, plugin files and archives.
 
-![Safe export](assets/safe-export.png)
+## Recovery and limitations
 
-**For database consistency, completely stop DSH and use the offline CLI.** GUI quiescence confirmation and file-change checks cannot establish multi-file transaction consistency.
+The expert offline backup CLI remains bin/backup-private.mjs, with explicit source paths and private/quiescence flags; it checks known writers before starting and committing. Ordinary desktop backup requires no Node commands. Restore uses the trusted assets/restore-private.cjs and accepts only a nonexistent fresh home. No merge, overwrite, install scripts or online dependency installation. See [restore](docs/RESTORE.md).
 
-## Offline restoration
+dsh-private-recovery/2 is unchanged: 0.4.0/0.4.1 private archives remain compatible; legacy 0.3.4 formats do not. Tested Windows 11 x64 build 10.0.26300, Desktop 0.2.1-rc.2, Electron Node 24.21.0 / ABI 149. Matching platform, architecture, exact DSH version, Node major and ABI are required. Limits: 128 MiB/file, about 2 GiB payload and 59,999 files/directories. Cross-machine/VM, real private database restoration, all external dependencies, network/OneDrive paths and all antivirus/DPI setups remain unvalidated. ZIP verification does not prove restored business operation. Hashes are not signatures.
 
-Use the trusted restore helper from the installed package, not a script from an unfamiliar ZIP. The target must be a new, nonexistent DSH_HOME with an existing parent. No overwrite or merge mode exists. Install matching DSH and external dependencies first.
+Ordinary errors/cooperative cancellation clean the current staging. Hard exits or power loss can leave private temporary files or locks; an atomic ZIP commit can precede its success record. Treat any unacknowledged output as unconfirmed. Preserve and inspect residues; no broad automatic deletion.
 
-```text
-node bin/backup-private.mjs --home <SOURCE_HOME> --profile <SOURCE_PROFILE> --zip <EXISTING_FOLDER/private.zip> --dsh-version 0.2.1-rc.2 --confirm-private --source-quiescent
-node assets/restore-private.cjs --zip <PRIVATE_ZIP> --home <NEW_HOME> --profile-name restored --dsh-version 0.2.1-rc.2 --confirm-private
-```
-
-Use the source DSH's compatible runtime, not an arbitrary system Node. Tested: Windows x64, DSH Desktop 0.2.1-rc.2, its Electron Node 24.21.0 / ABI 149. Its executable can run these scripts with process-local ELECTRON_RUN_AS_NODE=1 and --expose-internals. See [restore instructions](docs/RESTORE.md).
-
-The helper checks the complete entry set, paths, CRC and SHA-256 before staging writes, verifies the restored files and commits a fresh home. No network, pnpm, tar.exe or lifecycle scripts are used. Boot the new home separately and validate actual plugin functionality and external paths afterwards.
-
-## Limits
-
-- Legacy 0.3.4 directory/declaration formats are incompatible; no automatic conversion. 0.4.0 and 0.4.1 private ZIPs share a format and cross-patch restoration was tested.
-- Private Windows ACLs are not encryption. Hashes are not signatures. Local TOCTOU and hard-exit residue limits remain.
-- Limits: 128 MiB per file, about 2 GiB payload, 59,999 files plus directories. Oversize inputs or cyclic dependency links fail rather than silently truncate.
-- External file/link sources, absolute paths, runtimes and OS/browser credentials need separate migration. The preserved lockfile does not imply a frozen offline pnpm reinstall.
-- Another machine/VM, real private database restoration, arbitrary versions, network/OneDrive paths, all DPI/multi-monitor/antivirus conditions and all external dependencies were not validated.
-
-## Validation and licensing
-
-Synthetic backup/restore, exact hashes, host startup/restart and negative paths were tested. 0.4.1 fixes restoration counters without a progress callback. [Build/test details](docs/BUILD-TEST.md).
-
-[MIT](LICENSE) applies to maintainer-controlled contributions; js-yaml retains Vitaly Puzrin's MIT notice. See [third-party notices](THIRD_PARTY_NOTICES.md). Early development records are incomplete; this is not an exclusive historical authorship claim. [Provenance](docs/PROVENANCE.md).
+Build and isolated candidate installation: [instructions](docs/BUILD-TEST.md). Production upgrade and GitHub Release require separate approval. No npm publication. The scoped MIT grant, js-yaml author/license and historical provenance disclosure remain intact. New assistant sources add no bundled runtime, binary or npm dependency.

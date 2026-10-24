@@ -7,8 +7,10 @@
 5. The helper validates all entries and hashes before staging, verifies written bytes, and commits a new home. No lifecycle script or package manager runs. A reported verified file count is not a substitute for subsequent business validation.
 6. Start DSH with the new DSH_HOME and a separate agents directory; check plugin activation, configuration, databases, models and external paths before deciding on manual migration.
 
-Legacy 0.3.4 full directories and declaration ZIPs are not compatible. 0.4.0 and 0.4.1 private ZIPs use dsh-private-recovery/2; prefer the 0.4.1 trusted helper for accurate counters. Safe-config ZIPs cannot restore an environment.
+Legacy 0.3.4 full directories and declaration ZIPs are not compatible. 0.4.0, 0.4.1 and 0.4.2 private ZIPs use dsh-private-recovery/2; prefer the 0.4.1 trusted helper for accurate counters. Safe-config ZIPs cannot restore an environment.
 
 On ordinary errors/cooperative cancellation, staging is cleaned. Hard process exit or power loss can leave private .*.private-*.tmp or .dsh-restore-* residue. It is not a completed artifact and is not automatically merged or resumed. Verify ownership and active processes before manually cleaning it. No automatic broad deletion is performed.
 
 Treat private ZIPs and copied credentials as secrets. The ACL is not encryption and can change when copied. Do not upload a backup for troubleshooting. Use only trusted backups: hashes do not authenticate their author.
+
+For 0.4.2 desktop backups use the native workflow in README, including manual exit and assistant confirmation. The expert offline backup CLI remains available; ordinary users need no Node command to create a backup.

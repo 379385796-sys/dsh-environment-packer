@@ -3,10 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAsarVersion } from './lib/collect.js';
-import { createPrivateBackup, PRIVATE_WARNING } from './lib/private-backup.js';
+import { PRIVATE_WARNING } from './lib/private-backup.js';
 import { collectSafeConfiguration } from './lib/safe-export.js';
 import { createZip } from './lib/zip.js';
-import { chooseDirectory, chooseSavePath } from './lib/dialog.js';
+import { chooseDirectory, chooseSavePath, confirmColdBackup } from './lib/dialog.js';
+import { startColdTask } from './lib/cold-task.js';
 import { TargetDirectoryError, defaultDirectory, resolveDirectory, resolveTarget, safeDefaultName } from './lib/target.js';
 import {
   TargetExistsError,
@@ -160,9 +161,10 @@ export function apply(ctx, config = {}) {
         const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
         const isCreate = pathname === `${PREFIX}/create` && request.method === 'POST';
         const isFull = pathname === `${PREFIX}/create-full` && request.method === 'POST';
+        const isCold = pathname === `${PREFIX}/cold-backup` && request.method === 'POST';
         const isDefaults = pathname === `${PREFIX}/defaults` && request.method === 'GET';
         const isPick = pathname === `${PREFIX}/pick-directory` && request.method === 'POST';
-        if (!isCreate && !isFull && !isDefaults && !isPick) {
+        if (!isCreate && !isFull && !isCold && !isDefaults && !isPick) {
           sendJson(response, 404, { ok: false, error: 'Not found' });
           return;
         }
@@ -178,12 +180,20 @@ export function apply(ctx, config = {}) {
         if (isDefaults) {
           sendJson(response, 200, {
             ok: true,
+            version: '0.4.2',
+            coldOnly: true,
+            quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),
             platform: process.platform,
             dialog: process.platform === 'win32',
             privateWarning: PRIVATE_WARNING,
             dshVersion: readAsarVersion(path.join(process.env.DSH_DESKTOP_ROOT || path.dirname(process.execPath), 'resources', 'app.asar')), 
           });
+          return;
+        }
+        // Retired, including callers that still send the old confirmation flags.
+        if (isFull) {
+          sendJson(response, 410, {ok:false,error:'HOT_BACKUP_DISABLED',code:'HOT_BACKUP_DISABLED'});
           return;
         }
         if (busy) {
@@ -194,6 +204,22 @@ export function apply(ctx, config = {}) {
         busy = true;
         try {
           const body = await readBody(request);
+          if (isCold) {
+            const homeDir = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
+            if (fs.existsSync(path.join(homeDir,'.packer-cold','active.lock'))) throw Object.assign(new Error('COLD_TASK_ACTIVE'),{code:'COLD_TASK_ACTIVE'});
+            // The host, never the browser, supplies source paths, runtime and task parameters.
+            const target = typeof body.manualTarget === 'string' && body.manualTarget.trim()
+              ? body.manualTarget.trim()
+              : await chooseSavePath({defaultName:safeDefaultName('dsh-private-cold-'+Date.now()+'.zip')});
+            if (!target) {sendJson(response,200,{ok:false,cancelled:true});return;}
+            const info = inspectTarget(target);
+            if (info.exists) throw new TargetExistsError(info.target);
+            if (!await confirmColdBackup()) {sendJson(response,200,{ok:false,cancelled:true});return;}
+            const dshVersion = readAsarVersion(path.join(process.env.DSH_DESKTOP_ROOT || path.dirname(process.execPath),'resources','app.asar'));
+            const task = await startColdTask({homeDir,profileDir:profileDirectory(),target:info.target,dshVersion,confirmExternal:true});
+            sendJson(response,202,{ok:true,...task});
+            return;
+          }
           if (isPick) {
             // Picking a folder only fills the target field. Nothing is written,
             // so a picker can never produce a file the operator did not ask for.
@@ -212,8 +238,6 @@ export function apply(ctx, config = {}) {
             } catch { /* an unavailable editor just means no config entries */ }
             return [];
           };
-          if (isFull && body.confirmPrivate !== true) throw Object.assign(new Error('PRIVATE_CONFIRMATION_REQUIRED'), {code:'PRIVATE_CONFIRMATION_REQUIRED'});
-          if (isFull && body.sourceQuiescent !== true) throw Object.assign(new Error('QUIESCENT_CONFIRMATION_REQUIRED'), {code:'QUIESCENT_CONFIRMATION_REQUIRED'});
 
           const requestedName = safeDefaultName(body.defaultName ?? body.fileName);
           const useDialog = body.mode === 'dialog';
@@ -237,14 +261,6 @@ export function apply(ctx, config = {}) {
           const targetInfo = inspectTarget(target);
           if (targetInfo.exists) throw new TargetExistsError(targetInfo.target);
 
-          if (isFull) {
-            const dshVersion = readAsarVersion(path.join(process.env.DSH_DESKTOP_ROOT || path.dirname(process.execPath), 'resources', 'app.asar'));
-            const result = createPrivateBackup({profileDir: profileDirectory(), homeDir: process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), target: targetInfo.target,
-              dshVersion, confirmPrivate: body.confirmPrivate === true, sourceQuiescent: body.sourceQuiescent === true});
-            // Never return a private payload/manifest or raw error to the HTTP caller.
-            sendJson(response, 200, {ok:true, mode:'private-full', path:result.path, bytes:result.bytes, files:result.files, cleanup:result.cleanup});
-            return;
-          }
           const environment = collectSafeConfiguration({profileDir:profileDirectory(), entries:editorEntries()});
           const archive = createZip(environment.files);
           const written = writeZipAtomic(targetInfo.target, archive, {parentReal:targetInfo.parentReal,parentDev:targetInfo.parentDev,parentIno:targetInfo.parentIno});

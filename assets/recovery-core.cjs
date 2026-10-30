@@ -110,7 +110,7 @@ function openZip(file) {
 }
 function validateManifest(zip) {
   let m; try { m=JSON.parse(zip.get('manifest.json').toString('utf8')); } catch(e) { fail(e.code||'INVALID_MANIFEST'); }
-  if(m.format!=='dsh-private-recovery/2'||m.mode!=='private-full'||!Array.isArray(m.files)||!Array.isArray(m.directories)||!m.compatibility) fail('INVALID_MANIFEST');
+  if(!['dsh-private-recovery/2','dsh-private-recovery/3'].includes(m.format)||m.mode!=='private-full'||!Array.isArray(m.files)||!Array.isArray(m.directories)||!m.compatibility) fail('INVALID_MANIFEST');
   if(!m.files.length||m.files.length+m.directories.length>MAX_ENTRIES-1||!m.files.some(f=>f?.path==='profile/package.json')) fail('INVALID_MANIFEST');
   const all=new Map([['manifest.json','file']]);
   for(const [items,type] of [[m.directories,'directory'],[m.files,'file']]) for(const item of items) {

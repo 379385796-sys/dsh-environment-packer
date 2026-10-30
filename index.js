@@ -8,6 +8,8 @@ import { collectSafeConfiguration } from './lib/safe-export.js';
 import { createZip } from './lib/zip.js';
 import { chooseDirectory, chooseSavePath, confirmColdBackup } from './lib/dialog.js';
 import { startColdTask } from './lib/cold-task.js';
+import { recoverColdTask } from './lib/task-guard.js';
+import { readUiOverview } from './lib/ui-overview.js';
 import { TargetDirectoryError, defaultDirectory, resolveDirectory, resolveTarget, safeDefaultName } from './lib/target.js';
 import {
   TargetExistsError,
@@ -162,9 +164,10 @@ export function apply(ctx, config = {}) {
         const isCreate = pathname === `${PREFIX}/create` && request.method === 'POST';
         const isFull = pathname === `${PREFIX}/create-full` && request.method === 'POST';
         const isCold = pathname === `${PREFIX}/cold-backup` && request.method === 'POST';
+        const isRecover = pathname === `${PREFIX}/recover-cold-task` && request.method === 'POST';
         const isDefaults = pathname === `${PREFIX}/defaults` && request.method === 'GET';
         const isPick = pathname === `${PREFIX}/pick-directory` && request.method === 'POST';
-        if (!isCreate && !isFull && !isCold && !isDefaults && !isPick) {
+        if (!isCreate && !isFull && !isCold && !isRecover && !isDefaults && !isPick) {
           sendJson(response, 404, { ok: false, error: 'Not found' });
           return;
         }
@@ -178,9 +181,13 @@ export function apply(ctx, config = {}) {
           return;
         }
         if (isDefaults) {
+          let currentProfile = null;
+          try { currentProfile = profileDirectory(); } catch { /* Unknown is displayed explicitly; no profile is created. */ }
           sendJson(response, 200, {
             ok: true,
-            version: '0.4.2',
+            profileDirectory: currentProfile,
+            taskOverview: readUiOverview(process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh')),
+            version: '0.4.3',
             coldOnly: true,
             quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),
@@ -197,13 +204,17 @@ export function apply(ctx, config = {}) {
           return;
         }
         if (busy) {
-          sendJson(response, 429, { ok: false, error: 'An export is already running' });
+          sendJson(response, 429, { ok: false, error: 'COLD_OPERATION_BUSY', code:'COLD_OPERATION_BUSY' });
           return;
         }
 
         busy = true;
         try {
           const body = await readBody(request);
+          if(isRecover) {
+            const result=await recoverColdTask(process.env.DSH_HOME || path.join(os.homedir(),'.dsh'),{confirmLegacyTaskId:body.confirmLegacyTaskId});
+            sendJson(response,200,result);return;
+          }
           if (isCold) {
             const homeDir = process.env.DSH_HOME || path.join(os.homedir(), '.dsh');
             if (fs.existsSync(path.join(homeDir,'.packer-cold','active.lock'))) throw Object.assign(new Error('COLD_TASK_ACTIVE'),{code:'COLD_TASK_ACTIVE'});
@@ -277,6 +288,9 @@ export function apply(ctx, config = {}) {
             staleTemps,
           });
         } catch (error) {
+          if(/^COLD_(?:TASK_|OPERATION_|STATE_|IDENTITY_|LEGACY_)/.test(error?.code||'')) {
+            sendJson(response,409,{ok:false,error:error.code,code:error.code});return;
+          }
           if (error instanceof TargetExistsError || error?.code === 'TARGET_EXISTS') {
             sendJson(response, 409, { ok: false, error: 'TARGET_EXISTS', code: 'TARGET_EXISTS' });
             return;

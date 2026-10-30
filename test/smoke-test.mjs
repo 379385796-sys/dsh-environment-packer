@@ -1,0 +1,14 @@
+import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
+import {createPrivateBackup} from '../lib/private-backup.js';import {collectSafeConfiguration} from '../lib/safe-export.js';
+const require=createRequire(import.meta.url),C=require('../assets/recovery-core.cjs'),{restore}=require('../assets/restore-private.cjs');
+if(process.platform!=='win32')throw Error('Windows recovery test required');
+const parent=path.resolve(process.env.DSH_PACKER_TEST_ROOT||path.join(os.tmpdir(),'dsh-packer-tests'));fs.mkdirSync(parent,{recursive:true});const root=fs.mkdtempSync(path.join(parent,'synthetic-')),home=path.join(root,'home'),profile=path.join(home,'profiles','source');fs.mkdirSync(profile,{recursive:true});
+fs.writeFileSync(path.join(profile,'package.json'),JSON.stringify({name:'synthetic',private:true,dependencies:{}}));fs.writeFileSync(path.join(profile,'config.json'),JSON.stringify({token:'SYNTHETIC_ONLY_NOT_A_REAL_KEY',prompt:'synthetic private prompt'}));
+const zip=path.join(root,'private.zip'),b=createPrivateBackup({homeDir:home,profileDir:profile,target:zip,dshVersion:'0.2.1-rc.2',confirmPrivate:true,sourceQuiescent:true});
+assert.throws(()=>createPrivateBackup({homeDir:home,profileDir:profile,target:path.join(root,'unconfirmed.zip')}),e=>e.code==='PRIVATE_CONFIRMATION_REQUIRED');
+const target=path.join(root,'restored'),r=restore({zipFile:zip,targetHome:target,dshVersion:'0.2.1-rc.2',confirmPrivate:true});assert.equal(r.verifiedFiles,b.files);assert.equal(JSON.parse(fs.readFileSync(path.join(target,'PACKER-RESTORE-RESULT.json'))).verifiedFiles,b.files);
+for(const f of b.manifest.files)assert.equal(C.sha(fs.readFileSync(path.join(target,'profiles','desktop',f.path.slice(8)))),f.sha256);
+assert.throws(()=>restore({zipFile:zip,targetHome:target,dshVersion:'0.2.1-rc.2',confirmPrivate:true}),e=>e.code==='TARGET_EXISTS');
+const events=[],r2=restore({zipFile:zip,targetHome:path.join(root,'with-progress'),dshVersion:'0.2.1-rc.2',confirmPrivate:true,onFile:n=>events.push(n)});assert.equal(r2.verifiedFiles,b.files);assert.equal(events.at(-1),b.files);
+const safe=collectSafeConfiguration({profileDir:profile});assert.equal(safe.manifest.restorableEnvironment,false);assert(!JSON.stringify(safe).includes('SYNTHETIC_ONLY_NOT_A_REAL_KEY'));
+console.log(JSON.stringify({status:'PASS',syntheticOnly:true,files:b.files,root}));

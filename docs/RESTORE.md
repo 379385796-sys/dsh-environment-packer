@@ -7,7 +7,7 @@
 5. The helper validates all entries and hashes before staging, verifies written bytes, and commits a new home. No lifecycle script or package manager runs. A reported verified file count is not a substitute for subsequent business validation.
 6. Start DSH with the new DSH_HOME and a separate agents directory; check plugin activation, configuration, databases, models and external paths before deciding on manual migration.
 
-Legacy 0.3.4 full directories and declaration ZIPs are not compatible. 0.4.0, 0.4.1 and 0.4.2 private ZIPs use dsh-private-recovery/2; prefer the 0.4.1 trusted helper for accurate counters. Safe-config ZIPs cannot restore an environment.
+Legacy 0.3.4 full directories and declaration ZIPs are not compatible. Older private ZIPs use dsh-private-recovery/2. The 0.4.3 candidate uses recovery/3 when installation peers are required; old readers reject it. Use the complete trusted candidate package, including assets and vendor/semver. It checks dependency metadata and, for host peers, the exact Desktop executable, archive, unpacked payload and provider bindings before staging and again before commit. A matching displayed DSH version alone is insufficient. See HOST-PEERS.md. Safe-config ZIPs cannot restore an environment.
 
 On ordinary errors/cooperative cancellation, staging is cleaned. Hard process exit or power loss can leave private .*.private-*.tmp or .dsh-restore-* residue. It is not a completed artifact and is not automatically merged or resumed. Verify ownership and active processes before manually cleaning it. No automatic broad deletion is performed.
 

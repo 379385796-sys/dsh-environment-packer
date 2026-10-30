@@ -1,4 +1,4 @@
-# DSH Environment Packer 0.4.2
+# DSH Environment Packer 0.4.3 (local candidate)
 
 [中文](README.md) · [Compatibility](docs/COMPATIBILITY.md) · [Restore](docs/RESTORE.md) · [Provenance](docs/PROVENANCE.md)
 
@@ -26,8 +26,10 @@ The old full-backup GUI is removed; POST /create-full always returns 410 HOT_BAC
 
 The expert offline backup CLI remains bin/backup-private.mjs, with explicit source paths and private/quiescence flags; it checks known writers before starting and committing. Ordinary desktop backup requires no Node commands. Restore uses the trusted assets/restore-private.cjs and accepts only a nonexistent fresh home. No merge, overwrite, install scripts or online dependency installation. See [restore](docs/RESTORE.md).
 
-dsh-private-recovery/2 is unchanged: 0.4.0/0.4.1 private archives remain compatible; legacy 0.3.4 formats do not. Tested Windows 11 x64 build 10.0.26300, Desktop 0.2.1-rc.2, Electron Node 24.21.0 / ABI 149. Matching platform, architecture, exact DSH version, Node major and ABI are required. Limits: 128 MiB/file, about 2 GiB payload and 59,999 files/directories. Cross-machine/VM, real private database restoration, all external dependencies, network/OneDrive paths and all antivirus/DPI setups remain unvalidated. ZIP verification does not prove restored business operation. Hashes are not signatures.
+Archives without installation peers keep recovery/2; installation peers require recovery/3 and the complete trusted candidate restore package. Older private archives retain format compatibility but now receive dependency checks. Legacy 0.3.4 formats are not accepted. Tested Windows 11 x64 build 10.0.26300, Desktop 0.2.1-rc.2, Electron Node 24.21.0 / ABI 149. Matching platform, architecture, exact DSH version, Node major and ABI are required. Limits: 128 MiB/file, about 2 GiB payload and 59,999 files/directories. Cross-machine/VM, real private database restoration, all external dependencies, network/OneDrive paths and all antivirus/DPI setups remain unvalidated. ZIP verification does not prove restored business operation. Hashes are not signatures.
 
 Ordinary errors/cooperative cancellation clean the current staging. Hard exits or power loss can leave private temporary files or locks; an atomic ZIP commit can precede its success record. Treat any unacknowledged output as unconfirmed. Preserve and inspect residues; no broad automatic deletion.
 
 Build and isolated installation: [instructions](docs/BUILD-TEST.md). Before production upgrade, quit normally, back up the plugin and preserve existing Junctions. Never overwrite an entire Profile. No npm publication. The scoped MIT grant, js-yaml author/license and historical provenance disclosure remain intact. New assistant sources add no bundled runtime, binary or npm dependency.
+
+0.4.3 adds guarded task recovery in the Packer page. Active kernel leases and exact process birth identities prevent unsafe recovery. Failed and unconfirmed ZIPs and diagnostics are preserved. Legacy 0.4.2 tasks require corroborated full-boot, clock, record and process evidence plus a second confirmation; insufficient evidence still fails closed. Installation-provided peers now require a strict source/version/runtime proof, recorded as recovery/3 and checked again by the trusted restore package. Browser-only seed names without proven versions and consumer realms remain a separate blocker; see docs/HOST-PEERS.md. This candidate has not been deployed or released; keep the installed 0.4.2 unchanged pending separate acceptance.

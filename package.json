@@ -1,6 +1,6 @@
 {
   "name": "dsh-environment-packer",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "type": "module",
   "description": "Verified private offline cold backup and fresh-environment recovery for DSH; independent Windows assistant.",
@@ -21,6 +21,7 @@
     "icon.svg",
     "vendor/*.mjs",
     "vendor/*.LICENSE",
+    "vendor/semver/**",
     "bin/*.mjs",
     "README.md",
     "DESIGN.md",

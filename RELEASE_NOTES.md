@@ -1,4 +1,14 @@
-# Environment Packer v0.4.2
+# dsh-environment-packer 0.4.3
+
+[Current GitHub Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.3) · [使用说明 / Usage](README.md) · [Compatibility](docs/COMPATIBILITY.md)
+
+Windows DSH Desktop RC5 cold backup, recovery/3 host compatibility, guarded abnormal-task recovery, an independent WinForms assistant, and terminal auto-exit. Private ZIPs remain unencrypted; restoration requires a fresh target and the exact compatible runtime/host contract.
+
+当前发布状态以上述 Release 为准。下载 tgz 和同名 SHA-256 文件，核对后通过官方插件界面安装。下方保留此前版本的历史记录，不代表本轮重新验收。
+
+Use the linked Release and matching tgz/checksum. The historical notes below retain their original validation scope; this documentation-only revision does not rerun acceptance.
+
+## Historical 0.4.2 notes
 
 ## 中文
 

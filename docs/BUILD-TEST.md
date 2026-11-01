@@ -1,4 +1,6 @@
-# Build and test 0.4.3 candidate
+# Build and test 0.4.3
+
+Version 0.4.3 is published; this document describes maintainer checks, not evidence that this documentation revision ran them. Use the Release checksum for installation. Earlier acceptance wording below refers to its development stage.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 
@@ -14,4 +16,4 @@ Human GUI acceptance is separate: page -> native Save As -> private confirmation
 
 Build with npm pack --ignore-scripts --json --pack-destination <workspace-output> and explicit npm cache. Audit actual tar entries and unpacked bytes, source test hashes, licenses, private path/secret patterns and the exact SHA-256. Keep previous candidates separately. private:true remains set; never deploy, push or publish as part of the build.
 
-Production acceptance remains distinct: the actual historical lock may still lack post-failure full-boot proof; historical stderr cannot be recreated retroactively. HOST-PEERS.md describes the installation proof and unresolved browser-seed version/realm requirements. Power loss, kernel hangs, all diagnostics simultaneously unwritable, network volumes, malicious same-user replay and full real business recovery remain outside the synthetic acceptance claim. The host-peer unit entry covers range, source/realm, shadowing and format cases; native cold tests include an actual installation-peer success. Independent artifact acceptance must also exercise recovery/3 restoration and DSH business startup.
+Production acceptance remains distinct: the actual historical lock may still lack post-failure full-boot proof; historical stderr cannot be recreated retroactively. [HOST-PEERS.md](HOST-PEERS.md) describes implemented installation/browser proofs and the conditions under which a particular peer still fails. Power loss, kernel hangs, all diagnostics simultaneously unwritable, network volumes, malicious same-user replay and full real business recovery remain outside the synthetic acceptance claim. The host-peer unit entry covers range, source/realm, shadowing and format cases; native cold tests include an actual installation-peer success. Independent artifact acceptance must also exercise recovery/3 restoration and DSH business startup.

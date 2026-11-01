@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.4.3 — unpublished candidate
+## 0.4.3
+
+Published as [v0.4.3](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.3). The following entries retain the development/acceptance chronology; earlier candidate wording is historical.
 
 ### Assistant UI revision — 2026-10-31
 
@@ -34,6 +36,7 @@ Introduce explicit private backup and narrow safe export modes, verified new-hom
 ## 0.3.4 and earlier — local development
 
 Historical local versions and audits remain private. Their directory/declaration formats are not accepted by the new restore helper. This repository starts from a reviewed snapshot; it does not recreate or backdate missing development commits.
+
 # 0.4.3 (candidate)
 
 - Guard task startup, cleanup and recovery with Windows kernel file leases and process birth identities.

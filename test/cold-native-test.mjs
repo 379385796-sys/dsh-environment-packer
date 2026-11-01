@@ -7,6 +7,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawn,spawnSync} from 'node:child_process';
 import {once} from 'node:events';
+import {createRequire} from 'node:module';
 import {recoverColdTask,taskOwners} from '../lib/task-guard.js';
 import {readRecord,powershell} from '../lib/cold-task.js';
 const runtime='D:/DeepSeek Harness/DeepSeek Harness.exe';
@@ -26,6 +27,10 @@ async function scenario(kind,reuse){
   const succeeds=kind.startsWith('success');
   const homeDir=reuse?.homeDir||path.join(base,kind,'home'),profileDir=path.join(homeDir,'profiles','synthetic'),target=path.join(path.dirname(homeDir),kind+'.zip');fs.mkdirSync(profileDir,{recursive:true});
   fs.writeFileSync(path.join(profileDir,'package.json'),JSON.stringify({name:'synthetic',dependencies:kind==='ordinary-failure'?{missing:'1.0.0'}:{}}));fs.writeFileSync(path.join(profileDir,'data.txt'),'SYNTHETIC_ONLY');
+  if(kind==='success-long-path'){
+    const file=path.join(profileDir,'data','x'.repeat(110),'y'.repeat(110),'synthetic.txt');
+    assert(file.length>300);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'SYNTHETIC_LONG_PATH_ONLY');
+  }
   if(kind.startsWith('peer-failure')){
     const plugin=path.join(profileDir,'node_modules','synthetic-peer');fs.mkdirSync(plugin,{recursive:true});fs.writeFileSync(path.join(profileDir,'package.json'),JSON.stringify({name:'synthetic',dependencies:{'synthetic-peer':'1.0.0'}}));fs.writeFileSync(path.join(plugin,'package.json'),JSON.stringify({name:'synthetic-peer',version:'1.0.0',peerDependencies:{'synthetic-missing-host-peer':'>=4.0.1 <5.0.0'}}));
   }
@@ -78,6 +83,10 @@ async function scenario(kind,reuse){
     assert.equal(observation.outcome,succeeds?'success':kind==='interactive-cancel'?'cancelled':'failed');
     assert.equal(typeof observation.workerExitCode,'number');
     if(succeeds)assert.equal(observation.workerExitCode,0);
+    if(kind==='success-long-path'){
+      const C=createRequire(import.meta.url)('../assets/recovery-core.cjs'),zip=C.openZip(target);
+      try{const manifest=C.validateManifest(zip),file=manifest.files.find(f=>f.path.endsWith('/synthetic.txt'));assert(file);assert.equal(zip.get(file.path).toString(),'SYNTHETIC_LONG_PATH_ONLY');}finally{zip.close();}
+    }
     console.log(JSON.stringify({kind,outcome:observation.outcome,exitDelayMs,receiptWaitMs:terminalShown-receipt.at}));
   }
   results.push({kind,status:'PASS',dir});console.log('PASS native '+kind);

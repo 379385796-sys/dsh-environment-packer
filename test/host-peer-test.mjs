@@ -49,4 +49,14 @@ const frontend='function reactFactory(){var R={};R.version="18.3.1";R.createElem
 check('seed-linked React version and exact DSH build contract are read',()=>assert.deepEqual(B.providers(frontend,{devDependencies:{react:'^18.2.0','@deepseek-ai/dsh-client-ui-primitives':'0.2.1-rc.5'}},['react','@deepseek-ai/dsh-client-ui-primitives']).map(p=>p.version),['0.2.1-rc.5','18.3.1']));
 check('unrelated version literals cannot prove a different seed',()=>assert.equal(B.providers(frontend.replace('react:ReactSeed','react:UI'),{devDependencies:{react:'^18.2.0'}},['react']).length,0));
 check('non-exact DSH browser build dependency is not guessed',()=>assert.equal(B.providers(frontend,{devDependencies:{'@deepseek-ai/dsh-client-ui-primitives':'^0.2.1'}},['@deepseek-ai/dsh-client-ui-primitives']).length,0));
+if(process.platform==='win32')check('archive changes during final host proof still abort before commit',()=>{
+ const C=require('../assets/recovery-core.cjs'),R=require('../assets/restore-private.cjs'),root=fs.mkdtempSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'proof-race-')),file=path.join(root,'synthetic.zip'),target=path.join(root,'fresh'),data=Buffer.from('{"name":"synthetic","dependencies":{}}');
+ const manifest={format:'dsh-private-recovery/3',mode:'private-full',compatibility:{dshVersion:'0.2.1-rc.5',platform:process.platform,arch:process.arch,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules},files:[{path:'profile/package.json',bytes:data.length,sha256:C.sha(data)}],directories:[],hostRequirements:{providers:[]},hostPeerBindings:[]};
+ const writer=new C.ZipWriter(file);writer.add('profile/package.json',data);writer.add('manifest.json',Buffer.from(JSON.stringify(manifest)));writer.finish();
+ // Boundary fault injection only in this test process. Product H.verifyHost
+ // remains strict and rejects this intentionally incomplete proof normally.
+ const original=H.verifyHost;let calls=0;H.verifyHost=()=>{if(++calls===2)fs.appendFileSync(file,'SYNTHETIC_CHANGED');return {providers:[]}};
+ try{assert.throws(()=>R.restore({zipFile:file,targetHome:target,dshVersion:'0.2.1-rc.5',confirmPrivate:true}),e=>e.code==='ARCHIVE_CHANGED')}finally{H.verifyHost=original}
+ assert.equal(calls,2);assert(!fs.existsSync(target));assert(!fs.readdirSync(root).some(n=>n.startsWith('.dsh-restore-')));
+});
 const report={status:'PASS',tests,syntheticOnly:true};fs.writeFileSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'host-peer-unit.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));

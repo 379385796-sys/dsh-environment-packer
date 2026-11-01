@@ -1,8 +1,14 @@
 # Changelog
 
-## 0.4.3
+## 0.5.0 — 2026-11-02
 
-Published as [v0.4.3](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.4.3). The following entries retain the development/acceptance chronology; earlier candidate wording is historical.
+- Add conservative coverage reporting, standalone read-only archive/runtime inspection, and a redesigned WPF recovery assistant with a small console-free managed launcher. Bundle its XAML, controller and launcher source; add no downloaded runtime.
+- Reuse the original ZIP/Manifest/CRC/SHA, dependency, exact host-proof and recovery transaction code. Reopen and revalidate before execution/commit; bind the inspected ZIP hash and reject stale source/target states. Existing formats, Home whitelist, cold defaults and user configuration remain compatible.
+- Keep private confirmation visible, distinguish backup files from the installed DSH program, explain blocked navigation, and retain process tracking if presentation fails after a worker starts.
+- Fix a real RC5 session-path issue in Windows PowerShell 5.1 read leases using extended spelling for validated long drive paths; retain FileShare.Read and all source/path safety checks.
+- Acceptance: real Desktop cold backup, exact-proof read-only verification, actual independent WPF recovery of 2307 synthetic files, restored Desktop startup/restart and four-plugin joint behavior. WPF safety/controller tests and a native long-path cold scenario passed. Full cross-device recovery remains untested.
+
+## 0.4.3 — unpublished candidate
 
 ### Assistant UI revision — 2026-10-31
 
@@ -36,7 +42,6 @@ Introduce explicit private backup and narrow safe export modes, verified new-hom
 ## 0.3.4 and earlier — local development
 
 Historical local versions and audits remain private. Their directory/declaration formats are not accepted by the new restore helper. This repository starts from a reviewed snapshot; it does not recreate or backdate missing development commits.
-
 # 0.4.3 (candidate)
 
 - Guard task startup, cleanup and recovery with Windows kernel file leases and process birth identities.

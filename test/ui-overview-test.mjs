@@ -1,4 +1,8 @@
 import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {readUiOverview} from '../lib/ui-overview.js';
+import {createRequire} from 'node:module';
+const {coverageReport}=createRequire(import.meta.url)('../assets/backup-coverage.cjs');
+const oldCoverage=coverageReport({files:[]});assert.equal(oldCoverage.omissionInventoryRecorded,false);assert.equal(oldCoverage.externalReferenceInventoryRecorded,false);assert.equal(oldCoverage.requiresExternalResourceReview,true);
+const knownCoverage=coverageReport({files:[{path:'profile/config.json',text:'SYNTHETIC_PRIVATE_PAYLOAD'},{path:'home/memory/db.sqlite'}],scope:{profile:'entire-selected-profile',home:['memory']},homeEntriesNotCaptured:['unknown-business-db','profiles'],exclusions:[],externalReferences:[]});assert.equal(knownCoverage.omissionInventoryRecorded,true);assert.equal(knownCoverage.home[0].files,1);assert.equal(knownCoverage.homeEntriesNotCaptured[0].needsManualReview,true);assert.equal(knownCoverage.fileIntegrityIsNotBusinessCoverage,true);assert(!JSON.stringify(knownCoverage).includes('SYNTHETIC_PRIVATE_PAYLOAD'));
 if(!process.env.DSH_PACKER_TEST_ROOT)throw Error('Explicit isolated test root required');
 const home=fs.mkdtempSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'ui-overview-')),root=path.join(home,'.packer-cold'),id='a'.repeat(32),other='b'.repeat(32);
 assert.equal(readUiOverview(home).state,'no-records');assert.deepEqual(fs.readdirSync(home),[]);

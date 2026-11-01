@@ -98,7 +98,7 @@ window.__ModuleLoader__.load({
         h('p',{className:'ep-bottom'},'界面继承 DSH 的主题与字号；独立助手外观在助手内调整。'));
       const tabNames=[['backup','备份'],['tasks','任务与恢复'],['help','帮助与诊断']];
       const onTabKey=(event,index)=>{let next;if(event.key==='ArrowRight')next=(index+1)%3;else if(event.key==='ArrowLeft')next=(index+2)%3;else if(event.key==='Home')next=0;else if(event.key==='End')next=2;else return;event.preventDefault();setTab(tabNames[next][0]);event.currentTarget.parentElement.children[next].focus();};
-      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},'0.4.3')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
+      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},'0.5.0')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
         h('div',{className:'ep-tabs',role:'tablist','aria-label':'环境恢复包功能'},tabNames.map(([name,label],i)=>h('button',{key:name,id:'ep-tab-'+name,type:'button',role:'tab','aria-selected':tab===name,'aria-controls':'ep-panel-'+name,tabIndex:tab===name?0:-1,onClick:()=>setTab(name),onKeyDown:event=>onTabKey(event,i)},label))),
         h('div',{className:'ep-status','data-tone':tone,role:'status','aria-live':'polite','aria-atomic':true,hidden:!message},h('strong',null,stateLabel),message),
         h('div',{role:'tabpanel',id:'ep-panel-'+tab,'aria-labelledby':'ep-tab-'+tab,tabIndex:0},tab==='backup'?backup:tab==='tasks'?tasks:help));

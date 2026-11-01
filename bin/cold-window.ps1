@@ -96,7 +96,12 @@ try {
           foreach ($file in $lease.files) {
             if (Test-Path -LiteralPath (Join-Path $TaskDirectory 'cancel')) { throw 'BACKUP_ABORTED' }
             # FileShare.Read permits backup readers but denies existing/new writers and deletion.
-            $stream = [IO.File]::Open($file,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+            # Node already inventories/validates absolute source paths and rejects
+            # reparse points. Framework File.Open otherwise rejects long valid
+            # drive paths. Only change their IO spelling, retaining the same
+            # kernel read lease and denial of write/delete sharing.
+            $leasePath=if($file.Length -ge 248 -and $file -match '^[A-Za-z]:\\'){'\\?\'+$file}else{$file}
+            $stream = [IO.File]::Open($leasePath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
             $script:leases.Add($stream)
             $count++
             if ($count % 200 -eq 0) { [Windows.Forms.Application]::DoEvents() }

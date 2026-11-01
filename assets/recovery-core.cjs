@@ -80,6 +80,12 @@ class ZipWriter {
 }
 function openZip(file) {
   noLinks(file); const fd=fs.openSync(file,'r');
+  const opened=fs.fstatSync(fd);
+  function assertUnchanged() {
+    noLinks(file);
+    const current=fs.fstatSync(fd),named=fs.lstatSync(file);
+    if(!current.isFile()||identity(opened)!==identity(current)||identity(named)!==identity(opened)||opened.size!==current.size||opened.mtimeMs!==current.mtimeMs||opened.ctimeMs!==current.ctimeMs) fail('ARCHIVE_CHANGED');
+  }
   function read(pos,len) {
     if (!Number.isSafeInteger(pos)||!Number.isSafeInteger(len)||len<0||pos<0||len>MAX_FILE||pos+len>size) fail('INVALID_ZIP');
     const b=Buffer.alloc(len); let n=0;
@@ -102,7 +108,12 @@ function openZip(file) {
       records.set(name.toLowerCase(),{name,pos:loc+30+nl,len,crc:c.readUInt32LE(16)}); p+=46+nl;
     }
     if(p!==size-22||offset!==start) fail('INVALID_ZIP');
-    return { records, close:()=>fs.closeSync(fd), get(name) {
+    assertUnchanged();
+    return { records, close:()=>fs.closeSync(fd), assertUnchanged, fingerprint() {
+      assertUnchanged();const hash=crypto.createHash('sha256'),chunk=Buffer.alloc(1024*1024);let pos=0;
+      while(pos<size){const n=fs.readSync(fd,chunk,0,Math.min(chunk.length,size-pos),pos);if(!n)fail('ARCHIVE_CHANGED');hash.update(chunk.subarray(0,n));pos+=n;}
+      assertUnchanged();return hash.digest('hex');
+    }, get(name) {
       const r=records.get(name.toLowerCase()); if(!r||r.name!==name) fail('MISSING_ARCHIVE_FILE');
       const b=read(r.pos,r.len); if(crc(b)!==r.crc) fail('ZIP_CRC_MISMATCH'); return b;
     }};

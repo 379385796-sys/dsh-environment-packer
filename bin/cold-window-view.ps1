@@ -1,15 +1,28 @@
 ﻿# View only. This module never confirms exit, cancels a task, changes ownership or writes task records.
 if (-not ('PackerViews.RoundButton' -as [type])) {
-Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -TypeDefinition @'
+Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing,Accessibility -TypeDefinition (@'
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
+using System.Runtime.InteropServices;
 namespace PackerViews {
-  public class BufferedForm:Form { public BufferedForm(){DoubleBuffered=true;ResizeRedraw=true;} }
+  public class BufferedForm:Form {
+    [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr h,int a,ref int v,int s);
+    public BufferedForm(){DoubleBuffered=true;ResizeRedraw=true;}
+    public void FitWorkingArea(Size logical){
+      float scale;using(Graphics g=CreateGraphics())scale=g.DpiX/96f;
+      Rectangle area=Screen.FromControl(this).WorkingArea;int chromeWidth=Width-ClientSize.Width,chromeHeight=Height-ClientSize.Height;
+      ClientSize=new Size(Math.Max(1,Math.Min((int)Math.Round(logical.Width*scale),area.Width-chromeWidth-24)),Math.Max(1,Math.Min((int)Math.Round(logical.Height*scale),area.Height-chromeHeight-24)));
+      Location=new Point(area.Left+Math.Max(0,(area.Width-Width)/2),area.Top+Math.Max(0,(area.Height-Height)/2));
+    }
+    public void SetDarkChrome(bool dark){if(!IsHandleCreated||SystemInformation.HighContrast)return;try{int value=dark?1:0;DwmSetWindowAttribute(Handle,20,ref value,4);int border=ColorTranslator.ToWin32(BackColor);DwmSetWindowAttribute(Handle,34,ref border,4);}catch{}}
+    protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);try{if(!SystemInformation.HighContrast){int round=2;DwmSetWindowAttribute(Handle,33,ref round,4);SetDarkChrome(BackColor.GetBrightness()<.4f);}}catch{}}
+  }
   public class BufferedPanel:Panel { public BufferedPanel(){DoubleBuffered=true;ResizeRedraw=true;} }
   public class BufferedTableLayoutPanel:TableLayoutPanel { public BufferedTableLayoutPanel(){DoubleBuffered=true;ResizeRedraw=true;} }
   public static class DrawingTools {
+    public static Color Blend(Color a,Color b,float amount){return Color.FromArgb((int)(a.R+(b.R-a.R)*amount),(int)(a.G+(b.G-a.G)*amount),(int)(a.B+(b.B-a.B)*amount));}
     public static GraphicsPath Round(RectangleF r,float radius) {
       GraphicsPath p=new GraphicsPath();float d=Math.Min(radius*2,Math.Min(r.Width,r.Height));
       if(d<1){p.AddRectangle(r);return p;}
@@ -19,29 +32,38 @@ namespace PackerViews {
   }
   public class RoundSurface:Panel {
     public Color BorderColor {get;set;}
-    public RoundSurface(){DoubleBuffered=true;BorderColor=Color.Gainsboro;}
+    public RoundSurface(){DoubleBuffered=true;ResizeRedraw=true;BorderColor=Color.Gainsboro;}
     protected override void OnPaintBackground(PaintEventArgs e){
       e.Graphics.Clear(Parent==null?SystemColors.Window:Parent.BackColor);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
       if(Width<2||Height<2)return;
-      using(GraphicsPath p=DrawingTools.Round(new RectangleF(.5f,.5f,Width-1,Height-1),11)){
+      using(GraphicsPath p=DrawingTools.Round(new RectangleF(.5f,.5f,Width-1,Height-1),14*Font.Height/17f)){
         using(Brush b=new SolidBrush(BackColor))e.Graphics.FillPath(b,p);using(Pen pen=new Pen(BorderColor))e.Graphics.DrawPath(pen,p);
       }
     }
   }
   public class RoundButton:Button {
+    private bool hover,pressed;
+    private string measuredText;private Font measuredFont;private int measuredWidth=-1,measuredDpi;private Size measuredSize;
     public bool Primary {get;set;} public Color Accent {get;set;} public Color OnAccent {get;set;}
     public Color LineColor {get;set;} public bool Quiet {get;set;}
-    public RoundButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;DoubleBuffered=true;AutoSize=true;Accent=Color.RoyalBlue;OnAccent=Color.White;LineColor=Color.Gainsboro;Padding=new Padding(12,8,12,8);}
+    public RoundButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;DoubleBuffered=true;ResizeRedraw=true;AutoSize=true;Accent=Color.RoyalBlue;OnAccent=Color.White;LineColor=Color.Gainsboro;Padding=new Padding(12,8,12,8);}
+    protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
+    protected override void OnMouseLeave(EventArgs e){hover=false;pressed=false;Invalidate();base.OnMouseLeave(e);}
+    protected override void OnMouseDown(MouseEventArgs e){pressed=true;Invalidate();base.OnMouseDown(e);}
+    protected override void OnMouseUp(MouseEventArgs e){pressed=false;Invalidate();base.OnMouseUp(e);}
     public override Size GetPreferredSize(Size proposed){
       int max=MaximumSize.Width>0?MaximumSize.Width:1600;
-      Size text=TextRenderer.MeasureText(Text,Font,new Size(Math.Max(30,max-28),Int32.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
-      return new Size(Math.Min(max,text.Width+28),Math.Max(38,text.Height+18));
+      if(measuredWidth==max&&measuredDpi==DeviceDpi&&measuredText==Text&&Object.ReferenceEquals(measuredFont,Font))return measuredSize;
+      Size text;Size available=new Size(Math.Max(30,max-28),Int32.MaxValue);TextFormatFlags flags=TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix;
+      if(IsHandleCreated){using(Graphics g=CreateGraphics())text=TextRenderer.MeasureText(g,Text,Font,available,flags);}else text=TextRenderer.MeasureText(Text,Font,available,flags);
+      measuredWidth=max;measuredDpi=DeviceDpi;measuredText=Text;measuredFont=Font;measuredSize=new Size(Math.Min(max,text.Width+28),Math.Max(38,text.Height+18));return measuredSize;
     }
     protected override void OnPaint(PaintEventArgs e){
       e.Graphics.Clear(Parent==null?BackColor:Parent.BackColor);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
       Color fill=Primary?Accent:BackColor,fg=Primary?OnAccent:ForeColor;
       if(!Enabled){fill=BackColor;fg=SystemColors.GrayText;}
-      using(GraphicsPath p=DrawingTools.Round(new RectangleF(.5f,.5f,Math.Max(1,Width-1),Math.Max(1,Height-1)),9)){
+      else if(hover||pressed){fill=DrawingTools.Blend(fill,Primary?OnAccent:ForeColor,pressed?.16f:.07f);}
+      using(GraphicsPath p=DrawingTools.Round(new RectangleF(.5f,.5f,Math.Max(1,Width-1),Math.Max(1,Height-1)),10*Font.Height/17f)){
         using(Brush b=new SolidBrush(fill))e.Graphics.FillPath(b,p);
         if(!Quiet&&!Primary)using(Pen pen=new Pen(LineColor))e.Graphics.DrawPath(pen,p);
       }
@@ -54,14 +76,15 @@ namespace PackerViews {
     public Color Accent {get;set;} public Color Muted {get;set;} public Color LineColor {get;set;}
     public Color SoftAccent {get;set;} public Color ErrorColor {get;set;}
     private string[] names={"退出 DSH","环境检查","文件打包","完整性校验","完成"};
-    public WizardSteps(){DoubleBuffered=true;TabStop=false;Active=-1;Height=70;AccessibleRole=AccessibleRole.Grouping;}
+    public WizardSteps(){DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Active=-1;Height=70;AccessibleRole=AccessibleRole.Grouping;}
     protected override void OnPaint(PaintEventArgs e){
-      base.OnPaint(e);Graphics g=e.Graphics;g.SmoothingMode=SmoothingMode.AntiAlias;
+      base.OnPaint(e);Graphics g=e.Graphics;g.Clear(BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
       float cell=ClientSize.Width/5f,d=Math.Max(25,Font.Height*1.45f),cy=d/2+5;
       for(int i=0;i<5;i++){
         float x=cell*(i+.5f);bool done=Complete||(Active>=0&&i<Active),active=i==Active;
-        if(i<4)using(Pen p=new Pen(LineColor))g.DrawLine(p,x+d/2+4,cy,x+cell-d/2-4,cy);
+        if(i<4)using(Pen p=new Pen(done?DrawingTools.Blend(LineColor,Accent,.45f):LineColor,2)){p.StartCap=p.EndCap=LineCap.Round;g.DrawLine(p,x+d/2+8,cy,x+cell-d/2-8,cy);}
         Color color=active&&FailureKnown?ErrorColor:active||done?Accent:Muted;
+        if(active)using(Brush halo=new SolidBrush(SoftAccent))g.FillEllipse(halo,x-d/2-5,cy-d/2-5,d+10,d+10);
         using(Brush b=new SolidBrush(active?color:done?SoftAccent:BackColor))g.FillEllipse(b,x-d/2,cy-d/2,d,d);
         if(!active&&!done)using(Pen p=new Pen(LineColor))g.DrawEllipse(p,x-d/2,cy-d/2,d,d);
         if(done){using(Pen p=new Pen(color,1.6f))g.DrawLines(p,new PointF[]{new PointF(x-5,cy),new PointF(x-1,cy+4),new PointF(x+6,cy-4)});}
@@ -72,9 +95,9 @@ namespace PackerViews {
   }
   public class PhaseGlyph:Control {
     public string Kind {get;set;} public Color Tint {get;set;} public Color SoftTint {get;set;}
-    public PhaseGlyph(){DoubleBuffered=true;TabStop=false;Size=new Size(52,52);Kind="waiting";}
+    public PhaseGlyph(){DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Size=new Size(52,52);Kind="waiting";}
     protected override void OnPaint(PaintEventArgs e){
-      Graphics g=e.Graphics;g.Clear(Parent.BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
+      Graphics g=e.Graphics;GraphicsState saved=g.Save();try{g.Clear(Parent.BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
       using(GraphicsPath bg=DrawingTools.Round(new RectangleF(0,0,Width,Height),15))using(Brush b=new SolidBrush(SoftTint))g.FillPath(b,bg);
       float scale=Math.Min(Width,Height)/52f;g.TranslateTransform((Width-26*scale)/2,(Height-26*scale)/2);g.ScaleTransform(scale,scale);
       using(Pen p=new Pen(Tint,1.7f)){
@@ -83,7 +106,7 @@ namespace PackerViews {
         else if(Kind=="writing"){g.DrawPolygon(p,new Point[]{new Point(13,2),new Point(23,7),new Point(23,19),new Point(13,25),new Point(3,19),new Point(3,7)});g.DrawLines(p,new Point[]{new Point(3,7),new Point(13,13),new Point(23,7)});g.DrawLine(p,13,13,13,25);}
         else if(Kind=="waiting"||Kind=="initial"){g.DrawLines(p,new Point[]{new Point(11,3),new Point(3,3),new Point(3,23),new Point(11,23)});g.DrawLine(p,9,13,24,13);g.DrawLines(p,new Point[]{new Point(18,7),new Point(24,13),new Point(18,19)});}
         else{g.DrawPolygon(p,new Point[]{new Point(13,2),new Point(23,6),new Point(22,18),new Point(13,25),new Point(4,18),new Point(3,6)});g.DrawLines(p,new Point[]{new Point(8,13),new Point(12,17),new Point(19,9)});}
-      }
+      }}finally{g.Restore(saved);}
     }
   }
   public class PhaseProgress:Control {
@@ -92,7 +115,7 @@ namespace PackerViews {
     public ProgressBarStyle Style{get{return style;}set{if(style==value)return;style=value;Pulse();Invalidate();}}
     public int MarqueeAnimationSpeed{get{return speed;}set{if(speed==value)return;speed=value;Pulse();}}
     public int Value{get{return value;}set{int next=Math.Max(0,Math.Min(100,value));if(this.value==next)return;this.value=next;Invalidate();}}
-    public PhaseProgress(){DoubleBuffered=true;Height=7;TabStop=false;AccessibleRole=AccessibleRole.ProgressBar;style=ProgressBarStyle.Marquee;timer=new Timer();timer.Interval=45;timer.Tick+=delegate{offset+=.022f;if(offset>1.35f)offset=0;Invalidate();};}
+    public PhaseProgress(){DoubleBuffered=true;ResizeRedraw=true;Height=7;TabStop=false;AccessibleRole=AccessibleRole.ProgressBar;style=ProgressBarStyle.Marquee;timer=new Timer();timer.Interval=45;timer.Tick+=delegate{offset+=.022f;if(offset>1.35f)offset=0;Invalidate();};}
     private void Pulse(){if(timer!=null)timer.Enabled=speed>0&&style==ProgressBarStyle.Marquee&&Visible&&SystemInformation.UIEffectsEnabled;}
     protected override void OnVisibleChanged(EventArgs e){base.OnVisibleChanged(e);Pulse();}
     protected override void OnPaint(PaintEventArgs e){Graphics g=e.Graphics;g.Clear(Parent.BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
@@ -105,19 +128,19 @@ namespace PackerViews {
     protected override void Dispose(bool disposing){if(disposing&&timer!=null)timer.Dispose();base.Dispose(disposing);}
   }
 }
-'@
+'@ + (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'assistant-controls.cs') -Raw -Encoding UTF8))
 }
 
 function New-PackerAssistantView([string]$Target) {
   $form=New-Object PackerViews.BufferedForm
   $form.Text='环境恢复包 · 独立助手';$form.StartPosition='CenterScreen';$form.TopMost=$true
-  $form.AutoScaleMode='Dpi';$form.AutoScaleDimensions=$form.CurrentAutoScaleDimensions
-  $form.Size=New-Object Drawing.Size(760,700);$form.MinimumSize=New-Object Drawing.Size(560,600)
+  $form.AutoScaleMode='Dpi';$form.AutoScaleDimensions=New-Object Drawing.SizeF(96,96)
+  $form.Size=New-Object Drawing.Size(780,700);$form.FormBorderStyle='FixedDialog';$form.MaximizeBox=$false;$form.MinimizeBox=$true;$form.SizeGripStyle='Hide'
   $form.Font=New-Object Drawing.Font('Microsoft YaHei UI',10.5)
   $form.AccessibleName='环境恢复包独立备份助手'
-  $hostPanel=New-Object PackerViews.BufferedPanel;$hostPanel.Dock='Fill';$hostPanel.AutoScroll=$true;$form.Controls.Add($hostPanel)
+  $viewport=New-Object PackerViews.ScrollViewport;$viewport.Dock='Fill';$form.Controls.Add($viewport);$hostPanel=$viewport.Content
   $root=New-Object PackerViews.BufferedTableLayoutPanel;$root.Dock='Top';$root.AutoSize=$true;$root.AutoSizeMode='GrowAndShrink'
-  $root.ColumnCount=1;$root.RowCount=13;$root.Padding=New-Object Windows.Forms.Padding(28,20,28,16)
+  $root.ColumnCount=1;$root.RowCount=13;$root.Padding=New-Object Windows.Forms.Padding(24,14,24,12)
   [void]$root.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle('Percent',100)))
   for($i=0;$i -lt 13;$i++){[void]$root.RowStyles.Add((New-Object Windows.Forms.RowStyle('AutoSize')))}
   $hostPanel.Controls.Add($root)
@@ -125,31 +148,31 @@ function New-PackerAssistantView([string]$Target) {
     $c=New-Object Windows.Forms.Label;$c.Text=$Text;$c.AutoSize=$true;$c.Dock='Fill';$c.Margin=New-Object Windows.Forms.Padding(0)
     if($Centered){$c.TextAlign='MiddleCenter'};return $c
   }
-  $header=New-Object Windows.Forms.Panel;$header.Dock='Fill';$header.Height=34;$header.Margin=New-Object Windows.Forms.Padding(0,0,0,18)
+  $header=New-Object Windows.Forms.Panel;$header.Dock='Fill';$header.Height=28;$header.Margin=New-Object Windows.Forms.Padding(0,0,0,10)
   $brand=New-Text '环境恢复包  ·  独立助手';$brand.Dock='Fill';$header.Controls.Add($brand)
   $gear=New-Object PackerViews.RoundButton;$gear.Text='外观';$gear.Quiet=$true;$gear.Dock='Right';$gear.AccessibleName='助手外观设置';$header.Controls.Add($gear)
   $root.Controls.Add($header,0,0)
-  $prefs=New-Object Windows.Forms.FlowLayoutPanel;$prefs.Dock='Fill';$prefs.AutoSize=$true;$prefs.WrapContents=$true;$prefs.Visible=$false
+  $prefs=New-Object PackerViews.RoundSettingsBar;$prefs.Dock='Fill';$prefs.AutoSize=$true;$prefs.WrapContents=$true;$prefs.Visible=$false;$prefs.Padding=New-Object Windows.Forms.Padding(12,10,12,10)
   $prefs.Margin=New-Object Windows.Forms.Padding(0,0,0,14)
-  $prefs.Controls.Add((New-Text '外观'))
-  $theme=New-Object Windows.Forms.ComboBox;$theme.DropDownStyle='DropDownList';$theme.Width=120;$theme.AccessibleName='助手主题'
+  $appearanceLabel=New-Text '主题';$appearanceLabel.Margin=New-Object Windows.Forms.Padding(0,10,10,0);$prefs.Controls.Add($appearanceLabel)
+  $theme=New-Object PackerViews.RoundChoice;$theme.DropDownStyle='DropDownList';$theme.Width=148;$theme.AccessibleName='助手主题'
   [void]$theme.Items.AddRange(@('跟随系统','浅色','深色'));$theme.SelectedIndex=0;$prefs.Controls.Add($theme)
-  $prefs.Controls.Add((New-Text '字号'))
-  $size=New-Object Windows.Forms.NumericUpDown;$size.Minimum=9;$size.Maximum=22;$size.DecimalPlaces=1;$size.Increment=.5;$size.Value=10.5;$size.Width=70;$size.AccessibleName='助手字号';$prefs.Controls.Add($size)
-  $root.Controls.Add($prefs,0,1)
-  $steps=New-Object PackerViews.WizardSteps;$steps.Dock='Fill';$steps.Margin=New-Object Windows.Forms.Padding(0,0,0,20);$root.Controls.Add($steps,0,2)
-  $glyph=New-Object PackerViews.PhaseGlyph;$glyph.Anchor='None';$glyph.Margin=New-Object Windows.Forms.Padding(0,0,0,12);$root.Controls.Add($glyph,0,3)
+  $fontLabel=New-Text '字号';$fontLabel.Margin=New-Object Windows.Forms.Padding(18,10,10,0);$prefs.Controls.Add($fontLabel)
+  $size=New-Object PackerViews.RoundNumber;$size.Minimum=9;$size.Maximum=22;$size.DecimalPlaces=1;$size.Increment=.5;$size.Value=10.5;$size.Width=176;$size.AccessibleName='助手字号';$prefs.Controls.Add($size)
+  $root.Controls.Add($prefs,0,12)
+  $steps=New-Object PackerViews.WizardSteps;$steps.Dock='Fill';$steps.Margin=New-Object Windows.Forms.Padding(0,0,0,10);$root.Controls.Add($steps,0,2)
+  $glyph=New-Object PackerViews.PhaseGlyph;$glyph.Size=New-Object Drawing.Size(48,48);$glyph.Anchor='None';$glyph.Margin=New-Object Windows.Forms.Padding(0,0,0,8);$root.Controls.Add($glyph,0,3)
   $title=New-Text '正在连接独立助手' $true;$root.Controls.Add($title,0,4)
-  $subtitle=New-Text '请暂时保持 DSH 运行，等待接管完成。' $true;$subtitle.Margin=New-Object Windows.Forms.Padding(0,6,0,20);$root.Controls.Add($subtitle,0,5)
-  $summary=New-Object PackerViews.RoundSurface;$summary.AutoSize=$true;$summary.AutoSizeMode='GrowAndShrink';$summary.Dock='Fill';$summary.Padding=New-Object Windows.Forms.Padding(14);$summary.Margin=New-Object Windows.Forms.Padding(0,0,0,12)
+  $subtitle=New-Text '请暂时保持 DSH 运行，等待接管完成。' $true;$subtitle.Margin=New-Object Windows.Forms.Padding(0,4,0,12);$root.Controls.Add($subtitle,0,5)
+  $summary=New-Object PackerViews.RoundSurface;$summary.AutoSize=$true;$summary.AutoSizeMode='GrowAndShrink';$summary.Dock='Fill';$summary.Padding=New-Object Windows.Forms.Padding(14);$summary.Margin=New-Object Windows.Forms.Padding(0,0,0,10)
   $summaryTable=New-Object Windows.Forms.TableLayoutPanel;$summaryTable.ColumnCount=1;$summaryTable.RowCount=3;$summaryTable.AutoSize=$true;$summaryTable.Dock='Top'
   [void]$summaryTable.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle('Percent',100)))
   for($i=0;$i -lt 3;$i++){[void]$summaryTable.RowStyles.Add((New-Object Windows.Forms.RowStyle('AutoSize')))}
   $count=New-Text '—';$unit=New-Text '等待任务记录';$instructions=New-Text '助手确认接管后，再正常退出 DSH。' $true
   $summaryTable.Controls.Add($count,0,0);$summaryTable.Controls.Add($unit,0,1);$summaryTable.Controls.Add($instructions,0,2);$summary.Controls.Add($summaryTable);$root.Controls.Add($summary,0,6)
   $progress=New-Object PackerViews.PhaseProgress;$progress.Dock='Fill';$progress.AccessibleName='当前阶段进度，非整体百分比';$progress.Margin=New-Object Windows.Forms.Padding(0,0,0,7);$root.Controls.Add($progress,0,7)
-  $hint=New-Text '尚未开始备份';$hint.Margin=New-Object Windows.Forms.Padding(0,0,0,18);$root.Controls.Add($hint,0,8)
-  $targetPanel=New-Object Windows.Forms.TableLayoutPanel;$targetPanel.AutoSize=$true;$targetPanel.AutoSizeMode='GrowAndShrink';$targetPanel.Dock='Fill';$targetPanel.ColumnCount=1;$targetPanel.RowCount=2;$targetPanel.Padding=New-Object Windows.Forms.Padding(0,12,0,12)
+  $hint=New-Text '尚未开始备份';$hint.Margin=New-Object Windows.Forms.Padding(0,0,0,10);$root.Controls.Add($hint,0,8)
+  $targetPanel=New-Object Windows.Forms.TableLayoutPanel;$targetPanel.AutoSize=$true;$targetPanel.AutoSizeMode='GrowAndShrink';$targetPanel.Dock='Fill';$targetPanel.ColumnCount=1;$targetPanel.RowCount=2;$targetPanel.Padding=New-Object Windows.Forms.Padding(0,8,0,8)
   [void]$targetPanel.RowStyles.Add((New-Object Windows.Forms.RowStyle('AutoSize')));[void]$targetPanel.RowStyles.Add((New-Object Windows.Forms.RowStyle('AutoSize')))
   [void]$targetPanel.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle('Percent',100)))
   $targetCaption=New-Text '保存位置';$destination=New-Object Windows.Forms.TextBox;$destination.ReadOnly=$true;$destination.Multiline=$true;$destination.WordWrap=$true;$destination.BorderStyle='None';$destination.Dock='Fill';$destination.Text=$Target;$destination.AccessibleName='备份 ZIP 保存位置';$destination.TabIndex=2
@@ -157,32 +180,38 @@ function New-PackerAssistantView([string]$Target) {
   $detailsBar=New-Object Windows.Forms.Panel;$detailsBar.Dock='Fill';$detailsBar.Height=34
   $resultCaption=New-Text '尚未开始备份';$resultCaption.Dock='Fill';$detailsBar.Controls.Add($resultCaption)
   $toggle=New-Object PackerViews.RoundButton;$toggle.Text='任务详情 ▾';$toggle.Quiet=$true;$toggle.Dock='Right';$toggle.TabIndex=3;$detailsBar.Controls.Add($toggle);$root.Controls.Add($detailsBar,0,10)
-  $logs=New-Object Windows.Forms.Panel;$logs.Dock='Fill';$logs.Height=180;$logs.Visible=$false
-  $label=New-Object Windows.Forms.TextBox;$label.Multiline=$true;$label.ReadOnly=$true;$label.WordWrap=$true;$label.ScrollBars='Vertical';$label.Dock='Fill';$label.BorderStyle='None';$label.AccessibleName='完整任务详情，只读';$label.TabIndex=4;$logs.Controls.Add($label);$root.Controls.Add($logs,0,11)
-  $footer=New-Object Windows.Forms.TableLayoutPanel;$footer.Dock='Fill';$footer.AutoSize=$true;$footer.AutoSizeMode='GrowAndShrink';$footer.ColumnCount=2;$footer.Padding=New-Object Windows.Forms.Padding(0,16,0,0)
+  $detailsBar.Controls.Add($gear);$gear.Text='外观 ▾';$gear.TabIndex=4
+  $logs=New-Object PackerViews.RoundSurface;$logs.Dock='Fill';$logs.Height=200;$logs.Visible=$false;$logs.Padding=New-Object Windows.Forms.Padding(14)
+  $label=New-Object PackerViews.LogTextBox;$label.Multiline=$true;$label.ReadOnly=$true;$label.WordWrap=$true;$label.ScrollBars='None';$label.Dock='Fill';$label.BorderStyle='None';$label.AccessibleName='完整任务详情，只读';$label.TabIndex=0
+  $logScroll=New-Object PackerViews.LogScrollBar;$logScroll.Editor=$label;$logScroll.Dock='Right';$logScroll.Width=12;$logScroll.AccessibleName='任务详情滚动位置';$logScroll.TabIndex=1
+  $logs.Controls.Add($label);$logs.Controls.Add($logScroll);$root.Controls.Add($logs,0,11)
+  $footer=New-Object Windows.Forms.TableLayoutPanel;$footer.Dock='Bottom';$footer.AutoSize=$true;$footer.AutoSizeMode='GrowAndShrink';$footer.ColumnCount=2;$footer.Padding=New-Object Windows.Forms.Padding(24,12,24,14)
   [void]$footer.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle('Percent',30)));[void]$footer.ColumnStyles.Add((New-Object Windows.Forms.ColumnStyle('Percent',70)))
   $warning=New-Text "私人 ZIP 未加密`r`n请保存在可信位置";$footer.Controls.Add($warning,0,0)
   $actions=New-Object Windows.Forms.FlowLayoutPanel;$actions.AutoSize=$true;$actions.AutoSizeMode='GrowAndShrink';$actions.Dock='Fill';$actions.WrapContents=$true;$actions.FlowDirection='RightToLeft'
   $confirmExit=New-Object PackerViews.RoundButton;$confirmExit.Text='我已正常退出，检查后继续';$confirmExit.Enabled=$false
   $cancel=New-Object PackerViews.RoundButton;$cancel.Text='取消任务'
   $open=New-Object PackerViews.RoundButton;$open.Text='打开所在文件夹';$open.Enabled=$false
-  $actions.Controls.Add($open);$actions.Controls.Add($confirmExit);$actions.Controls.Add($cancel);$footer.Controls.Add($actions,1,0);$root.Controls.Add($footer,0,12)
-  $gear.TabIndex=0;$prefs.TabIndex=1;$theme.TabIndex=0;$size.TabIndex=1;$targetPanel.TabIndex=2;$detailsBar.TabIndex=3;$logs.TabIndex=4;$footer.TabIndex=5;$open.TabIndex=0;$confirmExit.TabIndex=0;$cancel.TabIndex=1
-  $view=@{form=$form;label=$label;progress=$progress;confirmExit=$confirmExit;cancel=$cancel;open=$open;root=$root;hostPanel=$hostPanel;title=$title;subtitle=$subtitle;steps=$steps;glyph=$glyph;summary=$summary;count=$count;unit=$unit;instructions=$instructions;hint=$hint;destination=$destination;targetCaption=$targetCaption;resultCaption=$resultCaption;warning=$warning;theme=$theme;size=$size;brand=$brand;gear=$gear;prefs=$prefs;toggle=$toggle;logs=$logs;actions=$actions;footer=$footer;Phase='initial';LastPhase=$null;LastFiles=$null;FailureKnown=$false;LayingOut=$false;OwnFonts=@()}
+  $actions.Controls.Add($open);$actions.Controls.Add($confirmExit);$actions.Controls.Add($cancel);$footer.Controls.Add($actions,1,0);$form.Controls.Add($footer)
+  $prefs.TabIndex=5;$theme.TabIndex=0;$size.TabIndex=1;$targetPanel.TabIndex=2;$detailsBar.TabIndex=3;$logs.TabIndex=4;$footer.TabIndex=6;$open.TabIndex=0;$confirmExit.TabIndex=0;$cancel.TabIndex=1
+  $view=@{form=$form;label=$label;logScroll=$logScroll;viewport=$viewport;pageScroll=$viewport.ScrollBar;progress=$progress;confirmExit=$confirmExit;cancel=$cancel;open=$open;root=$root;hostPanel=$hostPanel;title=$title;subtitle=$subtitle;steps=$steps;glyph=$glyph;summary=$summary;count=$count;unit=$unit;instructions=$instructions;hint=$hint;destination=$destination;targetCaption=$targetCaption;resultCaption=$resultCaption;warning=$warning;theme=$theme;size=$size;brand=$brand;gear=$gear;prefs=$prefs;toggle=$toggle;logs=$logs;actions=$actions;footer=$footer;Phase='initial';LastPhase=$null;LastFiles=$null;FailureKnown=$false;LayingOut=$false;OwnFonts=@()}
   $layout={
     if($view.LayingOut){return}
-    $layoutKey=@($hostPanel.ClientSize.Width,$form.Font.Height,$prefs.Visible,$logs.Visible,$title.Text,$subtitle.Text,$unit.Text,$instructions.Text,$hint.Text,$resultCaption.Text,$cancel.Text,$confirmExit.Text) -join [char]31
+    $layoutKey=@($hostPanel.ClientSize.Width,$hostPanel.ClientSize.Height,$form.Font.Height,$prefs.Visible,$logs.Visible,$title.Text,$subtitle.Text,$unit.Text,$instructions.Text,$hint.Text,$resultCaption.Text,$cancel.Text,$confirmExit.Text) -join [char]31
     if($view.LayoutKey -ceq $layoutKey){return};$view.LayoutKey=$layoutKey;$view.LayingOut=$true
     $root.SuspendLayout();$form.SuspendLayout()
     try{
       $width=[Math]::Max(200,$hostPanel.ClientSize.Width-$root.Padding.Horizontal-12)
       foreach($c in @($title,$subtitle,$hint,$destination,$resultCaption)){$c.MaximumSize=New-Object Drawing.Size($width,0)}
       foreach($c in @($count,$unit,$instructions)){$c.MaximumSize=New-Object Drawing.Size([Math]::Max(100,$width-30),0)}
-      $steps.Height=[Math]::Max(70,$form.Font.Height*4+8)
-      $destination.Height=[Math]::Max($form.Font.Height+4,[Windows.Forms.TextRenderer]::MeasureText($destination.Text,$destination.Font,(New-Object Drawing.Size($width,1000)),[Windows.Forms.TextFormatFlags]::WordBreak).Height+6)
-      $actionWidth=[Math]::Max(180,[int]($width*.7)-12)
+      $steps.Height=if($form.Font.Height -le 20){68}else{$form.Font.Height*4+8}
+      $destinationHeight=[Math]::Max($form.Font.Height+4,[Windows.Forms.TextRenderer]::MeasureText($destination.Text,$destination.Font,(New-Object Drawing.Size($width,1000)),[Windows.Forms.TextFormatFlags]::WordBreak).Height+6)
+      $destination.MinimumSize=New-Object Drawing.Size(0,$destinationHeight);$destination.Height=$destinationHeight
+      $targetPanel.MinimumSize=New-Object Drawing.Size(0,($targetPanel.Padding.Vertical+$targetCaption.PreferredSize.Height+$destinationHeight+$destination.Margin.Vertical+6))
+      $actionWidth=[Math]::Max(160,[int](($form.ClientSize.Width-$footer.Padding.Horizontal)*.7)-12)
       $actions.MaximumSize=New-Object Drawing.Size($actionWidth,0)
-      foreach($b in @($open,$confirmExit,$cancel)){$b.MaximumSize=New-Object Drawing.Size(($actionWidth-8),0)}
+      foreach($button in @($open,$confirmExit,$cancel)){$button.MaximumSize=New-Object Drawing.Size(($actionWidth-8),0)}
+      if($logs.Visible){$remaining=$hostPanel.ClientSize.Height-($root.PreferredSize.Height-$logs.Height);$logs.Height=[Math]::Max($form.Font.Height*3+28,[Math]::Min(180,$remaining))}
     }finally{$root.ResumeLayout($true);$form.ResumeLayout($true);$view.LayingOut=$false}
   }.GetNewClosure()
   $view.Layout=$layout
@@ -199,17 +228,20 @@ function New-PackerAssistantView([string]$Target) {
       if($theme.SelectedIndex -eq 0){$setting=Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name AppsUseLightTheme -ErrorAction SilentlyContinue;$dark=$null -ne $setting -and $setting.AppsUseLightTheme -eq 0}
       $themeKey=@($dark,[Windows.Forms.SystemInformation]::HighContrast,[Windows.Forms.SystemInformation]::UIEffectsEnabled) -join '|'
       if($view.ThemeKey -ceq $themeKey){return}
-      $p=@{Bg=[Drawing.Color]::FromArgb(255,255,255);Layer=[Drawing.Color]::FromArgb(246,247,249);Text=[Drawing.Color]::FromArgb(36,39,46);Muted=[Drawing.Color]::FromArgb(99,107,120);Line=[Drawing.Color]::FromArgb(231,233,238);Accent=[Drawing.Color]::FromArgb(69,105,212);Soft=[Drawing.Color]::FromArgb(237,241,254);OnAccent=[Drawing.Color]::White;Error=[Drawing.Color]::FromArgb(190,70,81);Success=[Drawing.Color]::FromArgb(38,128,92)}
+      $p=@{Bg=[Drawing.Color]::FromArgb(247,249,252);Layer=[Drawing.Color]::FromArgb(238,242,247);Text=[Drawing.Color]::FromArgb(36,39,46);Muted=[Drawing.Color]::FromArgb(99,107,120);Line=[Drawing.Color]::FromArgb(223,229,238);Accent=[Drawing.Color]::FromArgb(40,49,65);Soft=[Drawing.Color]::FromArgb(227,233,243);OnAccent=[Drawing.Color]::White;Error=[Drawing.Color]::FromArgb(190,70,81);Success=[Drawing.Color]::FromArgb(38,128,92)}
       if($dark){$p=@{Bg=[Drawing.Color]::FromArgb(28,30,35);Layer=[Drawing.Color]::FromArgb(36,39,46);Text=[Drawing.Color]::FromArgb(231,233,238);Muted=[Drawing.Color]::FromArgb(164,171,184);Line=[Drawing.Color]::FromArgb(52,56,66);Accent=[Drawing.Color]::FromArgb(145,170,255);Soft=[Drawing.Color]::FromArgb(42,52,76);OnAccent=[Drawing.Color]::FromArgb(28,40,71);Error=[Drawing.Color]::FromArgb(243,151,160);Success=[Drawing.Color]::FromArgb(123,203,170)}}
       if([Windows.Forms.SystemInformation]::HighContrast){$p.Bg=[Drawing.SystemColors]::Window;$p.Layer=$p.Bg;$p.Text=[Drawing.SystemColors]::WindowText;$p.Muted=$p.Text;$p.Line=$p.Text;$p.Accent=[Drawing.SystemColors]::Highlight;$p.OnAccent=[Drawing.SystemColors]::HighlightText;$p.Soft=$p.Bg;$p.Error=$p.Text;$p.Success=$p.Text}
-      $view.Palette=$p;$view.Dark=$dark;$form.BackColor=$p.Bg
-      $queue=New-Object 'System.Collections.Generic.Queue[Windows.Forms.Control]';$queue.Enqueue($hostPanel)
-      while($queue.Count){$c=$queue.Dequeue();$c.BackColor=if($c -eq $summary -or $c -eq $footer -or $c -eq $logs){$p.Layer}else{$c.Parent.BackColor};$c.ForeColor=$p.Text
-        if($c -is [PackerViews.RoundSurface]){$c.BorderColor=$p.Line}
+      $view.Palette=$p;$view.Dark=$dark;$form.BackColor=$p.Bg;$form.SetDarkChrome($dark)
+      $viewport.BackColor=$p.Bg
+      $queue=New-Object 'System.Collections.Generic.Queue[Windows.Forms.Control]';$queue.Enqueue($viewport);$queue.Enqueue($footer)
+      while($queue.Count){$c=$queue.Dequeue();$c.BackColor=if($c -eq $summary -or $c -eq $logs -or $c -eq $prefs){$p.Layer}elseif($c -is [PackerViews.RoundChoice] -or $c -is [PackerViews.RoundNumber]){$p.Bg}else{$c.Parent.BackColor};$c.ForeColor=$p.Text
+        if($c -is [PackerViews.RoundSettingsBar]){$c.LineColor=$p.Line}
+        if($c -is [PackerViews.RoundChoice] -or $c -is [PackerViews.RoundNumber]){$c.LineColor=$p.Line;$c.SoftColor=$p.Soft};if($c -is [PackerViews.RoundSurface]){$c.BorderColor=$p.Line}
         if($c -is [PackerViews.RoundButton]){$c.Accent=$p.Accent;$c.OnAccent=$p.OnAccent;$c.LineColor=$p.Line}
+        if($c -is [PackerViews.LogScrollBar]){$c.ThumbColor=$p.Muted;$c.TrackColor=$p.Layer}
         foreach($child in $c.Controls){$queue.Enqueue($child)};$c.Invalidate()
       }
-      foreach($c in @($subtitle,$unit,$hint,$targetCaption,$resultCaption,$warning)){$c.ForeColor=$p.Muted}
+      foreach($c in @($subtitle,$unit,$hint,$targetCaption,$resultCaption,$warning,$appearanceLabel,$fontLabel)){$c.ForeColor=$p.Muted}
       $steps.Accent=$p.Accent;$steps.Muted=$p.Muted;$steps.LineColor=$p.Line;$steps.SoftAccent=$p.Soft;$steps.ErrorColor=$p.Error
       & $view.PaintPhase
       $progress.Accent=$p.Accent;$progress.Track=$p.Layer
@@ -233,7 +265,7 @@ function New-PackerAssistantView([string]$Target) {
     foreach($font in $old){$font.Dispose()}
   }.GetNewClosure()
   $size.Add_ValueChanged($setFonts);$theme.Add_SelectedIndexChanged($applyTheme)
-  $gear.Add_Click({$prefs.Visible=-not $prefs.Visible;$gear.AccessibleDescription=if($prefs.Visible){'外观设置已展开'}else{'外观设置已收起'};& $view.Layout}.GetNewClosure())
+  $gear.Add_Click({$prefs.Visible=-not $prefs.Visible;$gear.Text=if($prefs.Visible){'外观 ▴'}else{'外观 ▾'};$gear.AccessibleDescription=if($prefs.Visible){'外观设置已展开'}else{'外观设置已收起'};& $view.Layout;$hostPanel.ScrollControlIntoView($detailsBar)}.GetNewClosure())
   $toggle.Add_Click({$logs.Visible=-not $logs.Visible;$toggle.Text=if($logs.Visible){'收起任务详情 ▴'}else{'任务详情 ▾'};& $view.Layout}.GetNewClosure())
   foreach($button in @($confirmExit,$cancel,$open)){$button.Add_EnabledChanged($sync);$button.Add_TextChanged($sync)}
   $hostPanel.Add_SizeChanged($layout)
@@ -247,7 +279,7 @@ function New-PackerAssistantView([string]$Target) {
   }.GetNewClosure())
   $appearanceTimer=New-Object Windows.Forms.Timer;$appearanceTimer.Interval=3000;$appearanceTimer.Add_Tick($applyTheme);$appearanceTimer.Start()
   $form.Add_FormClosed({$appearanceTimer.Dispose();foreach($font in $view.OwnFonts){$font.Dispose()}}.GetNewClosure())
-  $form.Add_Shown({& $view.Layout;$height=[Math]::Min([Windows.Forms.Screen]::FromControl($form).WorkingArea.Height-100,[Math]::Max(550,$root.PreferredSize.Height+12));$form.ClientSize=New-Object Drawing.Size($form.ClientSize.Width,$height)}.GetNewClosure())
+  $form.Add_Shown({$form.FitWorkingArea((New-Object Drawing.Size(780,660)));& $view.Layout}.GetNewClosure())
   & $setFonts;& $sync;& $applyTheme
   $label.Text="正在初始化独立助手…`r`n请暂时不要退出 DSH。"
   Update-PackerAssistantState $view @{phase='initial';files=$null}

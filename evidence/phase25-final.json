@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-05",
+  "branch": "phase2/v0.6.0",
+  "baseline": "fc1e6c90254c116a9dd8ddf0d2ea18486324b8bf",
+  "userVisualAcceptance": true,
+  "realDPI": 96,
+  "real150DPITested": false,
+  "finalPluginAutomaticVisualReviewComplete": false,
+  "businessToolkitMismatches": [],
+  "results": [
+    {
+      "file": "tests-phase25-final\\appearance-controls-result.json",
+      "sha256": "b3fe08fc67747366f6e0d4f3ea90d7bd6be933edac8f64f41604876ed98296ab",
+      "status": "PASS",
+      "checks": 4
+    },
+    {
+      "file": "tests-phase25-final\\cold-paint-log-result.json",
+      "sha256": "64313e02a185fd20b373e956d68feb7173125554777735a9fb853163b211548e",
+      "status": "PASS",
+      "checks": 7
+    },
+    {
+      "file": "tests-phase25-final\\final-layout-result.json",
+      "sha256": "8ef1fbfead74d0fa14e6d099df7360c9359bb3b50b8982edb262ced0f0757ebc",
+      "status": "PASS",
+      "checks": 4
+    },
+    {
+      "file": "tests-phase25-final\\migration-browser-result.json",
+      "sha256": "35ac8f3a7cd34d332c1b352eb5ecfdc3621ecd41ff5def21722a2707f138e59e",
+      "status": "PASS",
+      "checks": 6
+    },
+    {
+      "file": "tests-phase25-final\\migration-business-result.json",
+      "sha256": "4e89490bb0bc76479a4e2374d49d836430796341738af779d3830ee1249ab684",
+      "status": "PASS",
+      "checks": 12
+    },
+    {
+      "file": "tests-phase25-final\\migration-contracts-result.json",
+      "sha256": "2d19a9c5cc5c9f80eb7c599bdff7237897c80139235a1fd296e2bb5d586bbc2a",
+      "status": "PASS",
+      "checks": 32
+    },
+    {
+      "file": "tests-phase25-final\\migration-wpf-result.json",
+      "sha256": "9e84189bc57c5cc37848f63b4d87c66d432d0770ffef43199f371ac5a3440818",
+      "status": "PASS",
+      "checks": 3
+    },
+    {
+      "file": "tests-phase25-final\\phase25-quality-result.json",
+      "sha256": "c60d61b751e2443383ed5d3515bad454286287bde1070c40aaea1afd3ff14264",
+      "status": "PASS",
+      "checks": 4
+    },
+    {
+      "file": "tests-phase25-final\\restore-view-results.json",
+      "sha256": "6d9efedb64b2a94a77047f1eee7aed3e84cdcecc481a67413c181c26c9698712",
+      "status": "PASS",
+      "checks": 10
+    },
+    {
+      "file": "tests-phase25-final\\cold-component-lLKseC\\results.json",
+      "sha256": "7374a3de7448ef61fb14ad8387d33826b4761ba773a5f8fc74e2fd56581dcb05",
+      "status": "PASS",
+      "checks": 7
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "ui-preview\\phase25-final\\01-cold-default-light.png",
+      "sha256": "00396904e42d3d2db68421afe3adc2e47f937af6f92c20875f588597b9349337"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\02-cold-fixed-window-menu.png",
+      "sha256": "f4aeb93d56231a10efa1210c1fb8168be9f6404f13d290a8f8ed27add0fa2f09"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\03-cold-details-light.jpg",
+      "sha256": "bc3c8d6951c70227611321de59397a92a15e80b68b831450314b89d10f75a67b"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\04-cold-details-settings-light.jpg",
+      "sha256": "eaa344d895726efb043a9562098879bd88afb6e0f0469183bf73f6ff0b04b03b"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\05-cold-details-settings-dark.jpg",
+      "sha256": "649e2b56ec5c2fa76b5582a7cfb2b63377439bf972d426ddce57c5b7c4839d08"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\06-restore-default.jpg",
+      "sha256": "145355fd408250c37cbfae35f0f463ce95e7135b3dfd48243ede5ec31e2f8bf7"
+    },
+    {
+      "file": "ui-preview\\phase25-final\\07-restore-plan.jpg",
+      "sha256": "42b093e4d2e993120b3e60247dcff9c24708b44e2da27397af5d58bfcb27b7e1"
+    }
+  ],
+  "rollbackPackageSHA256": "b301efa06bcb2b589e382c5a7c20ee07292e9899b4f34a452e1fd6faac84db11",
+  "limitations": [
+    "Real 150% DPI not tested",
+    "Final automatic plugin visual review stopped by Computer Use URL verification; user accepted current visuals",
+    "No DSH 0.2.2-rc.1 certification; testing outside this turn"
+  ]
+}

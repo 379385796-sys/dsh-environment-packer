@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAsarVersion } from './lib/collect.js';
-import { PRIVATE_WARNING } from './lib/private-backup.js';
+
 const MIGRATION_WARNING='私人环境 ZIP 未加密，可能含凭据、Prompt、会话、附件、记忆和插件数据。新版会收录已识别的外部记忆、Skills、工作区配置、插件载荷与已知偏好，不递归打包工程源码或 DSH 安装程序。未识别、缺失或不兼容项目会列入计划，关键项目未经验证不能提交。必须正常关闭 DSH 和相关写入者；完整性校验不代替恢复启动验收。';
 import { collectSafeConfiguration } from './lib/safe-export.js';
 import { createZip } from './lib/zip.js';

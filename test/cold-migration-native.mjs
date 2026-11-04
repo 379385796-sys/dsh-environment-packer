@@ -1,0 +1,17 @@
+import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {once} from 'node:events';import {createRequire} from 'node:module';
+import {readRecord} from '../lib/cold-task.js';import {taskOwners} from '../lib/task-guard.js';
+const require=createRequire(import.meta.url),R=require('../assets/migration-archive.cjs'),runtime='D:/DeepSeek Harness/DeepSeek Harness.exe';
+if(!process.env.DSH_PACKER_TEST_ROOT)throw Error('Explicit root required');
+const root=fs.mkdtempSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'cold-migrate-native-')),home=path.join(root,'home'),profile=path.join(home,'profiles/synthetic'),workspace=path.join(root,'workspace'),memory=path.join(root,'external-memory');
+fs.mkdirSync(profile,{recursive:true});fs.mkdirSync(workspace);fs.mkdirSync(memory);fs.writeFileSync(path.join(memory,'memory.md'),'SYNTHETIC_EXTERNAL_MEMORY');fs.writeFileSync(path.join(profile,'package.json'),JSON.stringify({name:'dsh-profile-synthetic',private:true,dependencies:{}}));fs.writeFileSync(path.join(profile,'cordis.patch.yml'),'- id: mnemon\n  config:\n    dataDir: '+JSON.stringify(memory)+'\n');
+const options={homeDir:home,profileDir:profile,target:path.join(root,'cold-v4.zip'),dshVersion:'0.2.1-rc.5',confirmExternal:true,archiveMode:'migrate',workspaceRoot:workspace,waitMs:30000};
+const source=`import {startColdTask} from ${JSON.stringify(new URL('../lib/cold-task.js',import.meta.url).href)};try{console.log(JSON.stringify(await startColdTask(${JSON.stringify(options)})));}catch(e){console.error(e.code);process.exitCode=1;}`;
+const child=spawn(runtime,['--expose-internals','--input-type=module','-e',source],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true,stdio:['ignore','pipe','pipe']});let err='';child.stderr.on('data',b=>err+=b);child.stdout.resume();const ended=once(child,'exit');
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));async function until(fn,ms=150000){const end=Date.now()+ms;while(Date.now()<end){try{const value=fn();if(value)return value;}catch{}await sleep(100);}throw Error('Cold migration deadline');}
+const dir=await until(()=>{const id=fs.readFileSync(path.join(home,'.packer-cold/active.lock'),'utf8'),d=path.join(home,'.packer-cold',id);return fs.existsSync(path.join(d,'accepted.json'))&&d;});assert.equal((await ended)[0],0,err);
+fs.writeFileSync(path.join(dir,'exit-confirmed.json'),JSON.stringify({id:path.basename(dir)}));const terminal=await until(()=>readRecord(path.join(dir,'terminal.json')));assert.equal(terminal.phase,'success',JSON.stringify(terminal));
+const lease=readRecord(path.join(dir,'lease-request.private.json'));assert(lease.files.includes(path.join(memory,'memory.md')));assert(fs.existsSync(path.join(dir,'lease-ready.json')));
+await until(()=>!taskOwners(dir).owners['ui-owner.json'],30000);
+const arc=R.readArchive(options.target);try{assert.equal(arc.manifest.format,R.FORMAT);const f=arc.manifest.files.find(f=>f.path.endsWith('/data/memory.md'));assert(f);assert.equal(arc.zip.get(f.path).toString(),'SYNTHETIC_EXTERNAL_MEMORY');}finally{arc.zip.close();}
+const report={status:'PASS',root,task:dir,format:R.FORMAT,externalSourceReadLease:true,shippedAssistantCoordinatorWorker:true,normalHandoffAndSourceExit:true,sourceLeasesReleased:readRecord(path.join(dir,'ui-result.json')).sourceLeasesReleased};
+fs.writeFileSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'cold-migration-native-result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));

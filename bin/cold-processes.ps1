@@ -1,9 +1,11 @@
-﻿param([string]$HomePath, [string]$RuntimePath, [string]$ExcludePids = '', [string]$TrackedPids = '', [string]$TaskId = '')
+﻿param([string]$HomePath, [string]$RuntimePath, [string]$ExcludePids = '', [string]$TrackedPids = '', [string]$TaskId = '', [string]$Roots64 = '')
 $ErrorActionPreference = 'Stop'
 try {
   $excluded = @($ExcludePids.Split(',') | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
   $tracked = @($TrackedPids.Split(',') | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
   $writers = @()
+  $sourceRoots=@($HomePath)
+  if($Roots64){$extra=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Roots64))|ConvertFrom-Json;foreach($root in $extra){if(-not [IO.Path]::IsPathRooted($root)){throw 'INVALID_COLD_TASK'};$sourceRoots+=([string]$root)}}
   $uncertain = $false
   $all = @(Get-CimInstance Win32_Process -ErrorAction Stop)
   $ownHostProbes = @()
@@ -106,7 +108,8 @@ try {
     # Conservative: every Desktop process using this runtime blocks, including another instance.
     $dsh = $p.Name -ieq [IO.Path]::GetFileName($RuntimePath) -or $p.Name -ieq 'DeepSeek Harness.exe'
     $database = $p.Name -match '^(postgres|mysqld|mariadbd|mongod|redis-server|sqlservr)\.exe$'
-    $referencesHome = $p.CommandLine -and $p.CommandLine.IndexOf($HomePath, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $referencesHome = $false
+    if($p.CommandLine){foreach($root in $sourceRoots){if($p.CommandLine.IndexOf($root,[StringComparison]::OrdinalIgnoreCase) -ge 0){$referencesHome=$true;break}}}
     if ($dsh -or $database -or $referencesHome -or $tracked -contains [int]$p.ProcessId) {
       if (-not $p.CreationDate) { $uncertain = $true; continue }
       $writers += @{ pid = [int]$p.ProcessId; born = $p.CreationDate.ToUniversalTime().ToString('o'); parent = [int]$p.ParentProcessId }

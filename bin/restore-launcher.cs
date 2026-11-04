@@ -15,7 +15,7 @@ internal static class RecoveryLauncher {
   [STAThread]
   private static int Main() {
     string bin=Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-    string script=Path.Combine(bin,"restore-assistant.ps1");
+    string script=Path.Combine(bin,"restore-entry.ps1");
     if(!File.Exists(script)||!File.Exists(Path.Combine(bin,"restore-window.xaml"))) {
       MessageBox(IntPtr.Zero,"恢复工具包不完整。请保留 EXE、脚本、XAML 和原恢复核心，勿只复制一个文件。","环境恢复包",0x10);
       return 1;

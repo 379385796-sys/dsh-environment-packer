@@ -1,5 +1,7 @@
 # DSH Environment Packer
 
+> 当前开发分支是 **v0.6.0 Phase 2 未发布候选**。新增完整环境迁移归档、两个路径的独立恢复及真实启动验证，使用方法与安全边界见 [迁移通道说明](docs/MIGRATION.md)。旧 strict-restore 保持原语义。下方 v0.5.0 下载、校验及旧恢复步骤记录的是已发布基线，不是本分支的发布声明。正式环境尚未安装本候选。
+
 [English](README.en.md) · [下载 v0.5.0](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.5.0) · [恢复指南](docs/RESTORE.zh-CN.md) · [兼容范围](docs/COMPATIBILITY.md)
 
 **DSH 的本地离线冷备份与灾难恢复工具。** 在 DSH 正常退出后备份当前 Profile 和指定 Home 数据；通过独立检查和恢复助手，将备份恢复到全新、兼容的环境。不是日常配置管理或同步工具。

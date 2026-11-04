@@ -11,7 +11,8 @@ if (!isMainThread) {
   const {job,flag,uiPid} = workerData, bits = new Int32Array(flag);
   try {
     const dir=path.join(job.homeDir,'.packer-cold',job.id);
-    const result = createPrivateBackup({...job,sourceQuiescent:true,preserveFailureArtifacts:true,signal:{get aborted(){return Atomics.load(bits,0)!==0;}},
+    const create=job.archiveMode==='migrate'?createRequire(import.meta.url)('../assets/migration-archive.cjs').createBackup:createPrivateBackup;
+    const result = await create({...job,sourceQuiescent:true,preserveFailureArtifacts:true,signal:{get aborted(){return Atomics.load(bits,0)!==0;}},
       onDependencyCheck:result=>writeRecord(path.join(dir,'dependency-check.json'),{id:job.id,...result,at:Date.now()}),
       onCommitted:receipt=>writeRecord(path.join(job.homeDir,'.packer-cold',job.id,'committed.json'),{id:job.id,...receipt,at:Date.now()}),
       onInventory:files=>{
@@ -68,11 +69,12 @@ if (!isMainThread) {
     if(readRecord(path.join(dir,'accepted.json')).id!==job.id) fail('INVALID_COLD_TASK');
     heartbeat=setInterval(guardedStatus,1000);
     const deadline=Date.now()+job.waitMs;
-    let quietSince=0;
+    let quietSince=0,lastWriters='';
     while(true) {
       if(asyncFailure)fail(asyncFailure);
       if(cancel()||!uiAlive()) fail('BACKUP_ABORTED');
       const current=processSnapshot(job,[process.pid,uiPid],tracked.map(p=>p.pid));
+      const writerKey=JSON.stringify(current);if(current.length&&writerKey!==lastWriters){diagnostic('waiting-writers','SOURCE_WRITERS_RUNNING',{writers:current});}lastWriters=writerKey;
       // PID+birth identity avoids treating PID reuse as proof that the old writer is alive.
       const alive=current.length>0||tracked.some(p=>{try{process.kill(p.pid,0);return !current.some(q=>q.pid===p.pid&&q.born!==p.born);}catch{return false;}});
       tracked=current;

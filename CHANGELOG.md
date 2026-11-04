@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 — Phase 2 unpublished candidate
+
+- Add the independent format-4 environment migration channel, manifest coverage, external memory/Skills and original package provenance capture, and typed rc.5 path/data adapters. Keep strict recovery/2 and recovery/3 compatibility rules unchanged.
+- Share deterministic inspect/plan/apply/verify/commit/rollback between the functional WPF assistant and CLI. Bind archive, target/runtime, directories and toolkit; stage fresh sibling Home/Workspace roots and enable activation only after runtime verification and normal restart.
+- Evaluate actual dependency/runtime/schema compatibility instead of rejecting source/target version inequality alone. Unknown critical data cannot commit as complete. No install hooks, source projects, cloud synchronization or release automation are added.
+- This is a local development candidate. Exact Phase 2 evidence and limitations are delivered separately; future DSH versions have no real-installation certification. UI unification and final release review remain later phases.
+
 ## 0.5.0 — 2026-11-02
 
 - Add conservative coverage reporting, standalone read-only archive/runtime inspection, and a redesigned WPF recovery assistant with a small console-free managed launcher. Bundle its XAML, controller and launcher source; add no downloaded runtime.

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAsarVersion } from './lib/collect.js';
 import { PRIVATE_WARNING } from './lib/private-backup.js';
+const MIGRATION_WARNING='私人环境 ZIP 未加密，可能含凭据、Prompt、会话、附件、记忆和插件数据。新版会收录已识别的外部记忆、Skills、工作区配置、插件载荷与已知偏好，不递归打包工程源码或 DSH 安装程序。未识别、缺失或不兼容项目会列入计划，关键项目未经验证不能提交。必须正常关闭 DSH 和相关写入者；完整性校验不代替恢复启动验收。';
 import { collectSafeConfiguration } from './lib/safe-export.js';
 import { createZip } from './lib/zip.js';
 import { chooseDirectory, chooseSavePath, confirmColdBackup } from './lib/dialog.js';
@@ -150,6 +151,20 @@ function profileDirectory() {
 export function apply(ctx, config = {}) {
   let routeDispose;
   let busy = false;
+  // Import only the known, validated preference once per restored origin.
+  // The script runs in the index head before client plugins read localStorage.
+  ctx.on('webserver/index-inject', table => {
+    const file=path.join(process.env.DSH_HOME||path.join(os.homedir(),'.dsh'),'PACKER-CLIENT-PREFERENCES.json');
+    if(!fs.existsSync(file))return;
+    try{
+      const record=JSON.parse(fs.readFileSync(file,'utf8'));
+      if(!/^[a-f0-9]{64}$/.test(record.planId)||record.key!=='dsh-chat-comfort.settings.v1')return;
+      const value={enabled:record.value.enabled,density:record.value.density};
+      if(typeof value.enabled!=='boolean'||!['compact','comfortable'].includes(value.density))return;
+      const data=JSON.stringify({id:record.planId,key:record.key,value}).replaceAll('<','\\u003c');
+      table.push({kind:'script',placement:'head',text:`try{const p=${data},m='dsh-packer.preference-import.'+p.id;if(!localStorage.getItem(m)){localStorage.setItem(p.key,JSON.stringify(p.value));localStorage.setItem(m,'1')}}catch{}`});
+    }catch{/* A malformed private preference must never become executable script. */}
+  });
 
   const ensureRoute = () => {
     if (routeDispose) return;
@@ -187,13 +202,13 @@ export function apply(ctx, config = {}) {
             ok: true,
             profileDirectory: currentProfile,
             taskOverview: readUiOverview(process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh')),
-            version: '0.5.0',
+            version: '0.6.0',
             coldOnly: true,
             quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),
             platform: process.platform,
             dialog: process.platform === 'win32',
-            privateWarning: PRIVATE_WARNING,
+            privateWarning: MIGRATION_WARNING,
             dshVersion: readAsarVersion(path.join(process.env.DSH_DESKTOP_ROOT || path.dirname(process.execPath), 'resources', 'app.asar')), 
           });
           return;
@@ -227,7 +242,7 @@ export function apply(ctx, config = {}) {
             if (info.exists) throw new TargetExistsError(info.target);
             if (!await confirmColdBackup()) {sendJson(response,200,{ok:false,cancelled:true});return;}
             const dshVersion = readAsarVersion(path.join(process.env.DSH_DESKTOP_ROOT || path.dirname(process.execPath),'resources','app.asar'));
-            const task = await startColdTask({homeDir,profileDir:profileDirectory(),target:info.target,dshVersion,confirmExternal:true});
+            const task = await startColdTask({homeDir,profileDir:profileDirectory(),target:info.target,dshVersion,confirmExternal:true,archiveMode:'migrate',clientPreferences:body.clientPreferences});
             sendJson(response,202,{ok:true,...task});
             return;
           }

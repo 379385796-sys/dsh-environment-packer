@@ -61,7 +61,9 @@ window.__ModuleLoader__.load({
       const go=async(manual=false)=>{
         if(busy)return;setBusy(true);setMessage('请在 Windows 窗口选择 ZIP 保存位置，再完成或取消“确认本次私人冷备份”。未确认不会创建任务；确认窗口可从任务栏找到。');
         try{
-          const response=await fetch('/plugins/dsh-environment-packer/cold-backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(manual?{manualTarget:target}:{}),cache:'no-store'});
+          let comfort;try{comfort=JSON.parse(localStorage.getItem('dsh-chat-comfort.settings.v1')||'null');}catch{}
+          const clientPreferences={'dsh-chat-comfort.settings.v1':{enabled:typeof comfort?.enabled==='boolean'?comfort.enabled:true,density:comfort?.density==='compact'?'compact':'comfortable'}};
+          const response=await fetch('/plugins/dsh-environment-packer/cold-backup',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...manual?{manualTarget:target}:{},clientPreferences}),cache:'no-store'});
           const r=await response.json();
           if(r.cancelled){setMessage('已取消；没有创建备份任务，DSH 继续运行。');return;}
           if(!response.ok||!r.ok){setMessage(labels[r.error]||`未启动备份（${r.error||response.status}）。请保持 DSH 运行，检查路径、权限和助手状态。`);if(/^SAVE_DIALOG_/.test(r.error||'')){setFallback(true);setTab('help');}return;}

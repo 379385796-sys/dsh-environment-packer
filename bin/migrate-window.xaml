@@ -1,0 +1,153 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="环境恢复包 · 恢复助手" Width="1020" Height="860" MinWidth="720" MinHeight="600"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
+        Background="{DynamicResource Canvas}" Foreground="{DynamicResource Ink}"
+        FontFamily="Microsoft YaHei UI" FontSize="13" UseLayoutRounding="True" SnapsToDevicePixels="True">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="48" ResizeBorderThickness="6" CornerRadius="12" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+  </shell:WindowChrome.WindowChrome>
+  <Window.Icon><DrawingImage><DrawingImage.Drawing><DrawingGroup><GeometryDrawing Brush="#17191D"><GeometryDrawing.Geometry><RectangleGeometry Rect="0,0,24,24" RadiusX="5" RadiusY="5"/></GeometryDrawing.Geometry></GeometryDrawing><GeometryDrawing Geometry="M 5,7 L 19,7 L 19,19 L 5,19 Z M 4,4 L 20,4 L 20,7 M 9,11 L 15,11 M 12,11 L 12,16 M 10,14 L 12,16 L 14,14"><GeometryDrawing.Pen><Pen Brush="White" Thickness="1.2"/></GeometryDrawing.Pen></GeometryDrawing></DrawingGroup></DrawingImage.Drawing></DrawingImage></Window.Icon>
+  <Window.Resources>
+    <SolidColorBrush x:Key="Canvas" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Layer" Color="#F7F8FA"/>
+    <SolidColorBrush x:Key="Soft" Color="#F0F1F3"/>
+    <SolidColorBrush x:Key="Ink" Color="#17191D"/>
+    <SolidColorBrush x:Key="Muted" Color="#717680"/>
+    <SolidColorBrush x:Key="Line" Color="#E5E7EB"/>
+    <SolidColorBrush x:Key="Accent" Color="#17191D"/>
+    <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Focus" Color="#5175D6"/>
+    <SolidColorBrush x:Key="Success" Color="#28765B"/>
+    <SolidColorBrush x:Key="Error" Color="#B64F54"/>
+    <SolidColorBrush x:Key="WarningBg" Color="#FAF7F0"/>
+    <Style TargetType="TextBlock"><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="LineHeight" Value="21"/></Style>
+    <Style x:Key="Hint" TargetType="TextBlock"><Setter Property="Foreground" Value="{DynamicResource Muted}"/><Setter Property="FontSize" Value="12"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="LineHeight" Value="20"/></Style>
+    <Style x:Key="Button" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource Canvas}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}"/><Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="Padding" Value="16,10"/><Setter Property="MinHeight" Value="40"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+        <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+          <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+        </Border>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.78"/></Trigger>
+          <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.6"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Focus}"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.36"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="Button" BasedOn="{StaticResource Button}"/>
+    <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource Button}"><Setter Property="Background" Value="{DynamicResource Accent}"/><Setter Property="Foreground" Value="{DynamicResource OnAccent}"/><Setter Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style x:Key="Quiet" TargetType="Button" BasedOn="{StaticResource Button}"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/></Style>
+    <Style x:Key="Caption" TargetType="Button" BasedOn="{StaticResource Quiet}"><Setter Property="Width" Value="44"/><Setter Property="MinHeight" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="FontFamily" Value="Segoe MDL2 Assets"/><Setter Property="FontSize" Value="10"/></Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="{DynamicResource Canvas}"/><Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="CaretBrush" Value="{DynamicResource Ink}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="12,10"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TextBox">
+        <Border x:Name="Field" CornerRadius="8" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}"><ScrollViewer x:Name="PART_ContentHost"/></Border>
+        <ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Field" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Field" Property="Opacity" Value="0.5"/></Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource Ink}"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="CheckBox">
+        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="22"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Border x:Name="Box" Width="18" Height="18" CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource Muted}" VerticalAlignment="Top" Margin="0,2,0,0" Background="{DynamicResource Canvas}">
+            <Path x:Name="Tick" Data="M 3,8 L 7,12 L 14,4" Stroke="{DynamicResource OnAccent}" StrokeThickness="1.8" Visibility="Collapsed"/>
+          </Border><ContentPresenter Grid.Column="1" Margin="10,0,0,0"/>
+        </Grid>
+        <ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Box" Property="Background" Value="{DynamicResource Accent}"/><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Accent}"/><Setter TargetName="Tick" Property="Visibility" Value="Visible"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Focus}"/><Setter TargetName="Box" Property="BorderThickness" Value="2"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger></ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ScrollBar">
+      <Setter Property="Width" Value="8"/><Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar"><Grid Margin="2"><Track x:Name="PART_Track" IsDirectionReversed="True"><Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Opacity="0" Focusable="False"/></Track.DecreaseRepeatButton><Track.Thumb><Thumb Background="{DynamicResource Line}"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{TemplateBinding Background}" CornerRadius="3"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb><Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Opacity="0" Focusable="False"/></Track.IncreaseRepeatButton></Track></Grid></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ScrollViewer">
+      <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/><Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollViewer"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><ScrollContentPresenter x:Name="PART_ScrollContentPresenter" CanContentScroll="{TemplateBinding CanContentScroll}" Margin="0,0,4,0"/><ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="1" Orientation="Vertical" Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}" Value="{Binding VerticalOffset,Mode=OneWay,RelativeSource={RelativeSource TemplatedParent}}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/></Grid></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="Card" TargetType="Border"><Setter Property="Background" Value="{DynamicResource Canvas}"/><Setter Property="BorderBrush" Value="{DynamicResource Line}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="12"/><Setter Property="Padding" Value="18"/></Style>
+    <Style x:Key="Navigation" TargetType="Button" BasedOn="{StaticResource Quiet}"><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="12"/><Setter Property="Margin" Value="0,0,0,8"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border x:Name="Nav" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="9" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Left"/></Border><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Nav" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Nav" Property="Background" Value="{DynamicResource Soft}"/></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.4"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style TargetType="ProgressBar"><Setter Property="Height" Value="5"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ProgressBar"><Border Background="{DynamicResource Soft}" CornerRadius="3" ClipToBounds="True"><Grid x:Name="PART_Track"><Border x:Name="PART_Indicator" Background="{DynamicResource Accent}" HorizontalAlignment="Left" CornerRadius="3"/><Border x:Name="Pulse" Width="100" HorizontalAlignment="Left" CornerRadius="3" Background="{DynamicResource Accent}" Visibility="Collapsed"><Border.RenderTransform><TranslateTransform X="-100"/></Border.RenderTransform></Border></Grid></Border><ControlTemplate.Triggers><Trigger Property="IsIndeterminate" Value="True"><Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed"/><Setter TargetName="Pulse" Property="Visibility" Value="Visible"/><Trigger.EnterActions><BeginStoryboard x:Name="PulseAnimation"><Storyboard><DoubleAnimation Storyboard.TargetName="Pulse" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" From="-100" To="600" Duration="0:0:1.6" RepeatBehavior="Forever"/></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><StopStoryboard BeginStoryboardName="PulseAnimation"/></Trigger.ExitActions></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
+  </Window.Resources>
+  <Border Background="{DynamicResource Canvas}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="12">
+    <Grid><Grid.RowDefinitions><RowDefinition Height="48"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <Grid Margin="18,0,8,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><Border Width="24" Height="24" Background="{DynamicResource Ink}" CornerRadius="6" Margin="0,0,10,0"><Path Data="M 5,7 L 19,7 L 19,19 L 5,19 Z M 4,4 L 20,4 L 20,7 M 9,11 L 15,11 M 12,11 L 12,16 M 10,14 L 12,16 L 14,14" Stroke="{DynamicResource OnAccent}" StrokeThickness="1.1" Stretch="Uniform" Margin="5"/></Border><TextBlock Text="环境恢复包" FontWeight="SemiBold" VerticalAlignment="Center"/><TextBlock Text=" / 独立恢复助手" Foreground="{DynamicResource Muted}" VerticalAlignment="Center"/></StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" shell:WindowChrome.IsHitTestVisibleInChrome="True"><Button x:Name="Minimize" Content="&#xE921;" Style="{StaticResource Caption}" AutomationProperties.Name="最小化"/><Button x:Name="Maximize" Content="&#xE922;" Style="{StaticResource Caption}" AutomationProperties.Name="最大化或还原"/><Button x:Name="CloseCaption" Content="&#xE8BB;" Style="{StaticResource Caption}" AutomationProperties.Name="关闭恢复助手"/></StackPanel>
+      </Grid>
+      <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition x:Name="RailColumn" Width="196"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Background="{DynamicResource Layer}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,1,0"><Grid Margin="16,24,16,18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <StackPanel><TextBlock Text="恢复环境" FontSize="17" FontWeight="SemiBold" Margin="12,0,0,6"/><TextBlock x:Name="RailHint" Text="从备份重新开始" Style="{StaticResource Hint}" Margin="12,0,0,24"/>
+            <Button x:Name="StepBackup" Style="{StaticResource Navigation}" AutomationProperties.Name="检查备份"><StackPanel><TextBlock Text="01   检查备份" FontWeight="SemiBold"/><TextBlock Text="完整性与覆盖范围" Style="{StaticResource Hint}" Margin="25,3,0,0"/></StackPanel></Button>
+            <Button x:Name="StepTarget" Style="{StaticResource Navigation}" IsEnabled="False" AutomationProperties.Name="确认恢复目标"><StackPanel><TextBlock Text="02   确认目标" FontWeight="SemiBold"/><TextBlock Text="迁移计划与私人确认" Style="{StaticResource Hint}" Margin="25,3,0,0"/></StackPanel></Button>
+            <Button x:Name="StepResult" Style="{StaticResource Navigation}" IsEnabled="False" AutomationProperties.Name="恢复进度与结果"><StackPanel><TextBlock Text="03   恢复结果" FontWeight="SemiBold"/><TextBlock Text="文件校验与启动验收" Style="{StaticResource Hint}" Margin="25,3,0,0"/></StackPanel></Button>
+          </StackPanel>
+          <StackPanel Grid.Row="2" Margin="12,12,4,0"><Path Data="M 10,1 L 18,4 L 18,11 Q 17,16 10,20 Q 3,16 2,11 L 2,4 Z M 6,10 L 9,13 L 14,7" Stroke="{DynamicResource Muted}" StrokeThickness="1.3" Width="21" Height="22" Stretch="Uniform" HorizontalAlignment="Left" Margin="0,0,0,8"/><TextBlock Text="本地离线恢复" FontSize="12"/><TextBlock Text="不下载 DSH&#x0a;不覆盖现有 Home" Style="{StaticResource Hint}" Margin="0,4,0,0"/></StackPanel>
+        </Grid></Border>
+        <Grid Grid.Column="1" Background="{DynamicResource Canvas}"><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <ScrollViewer x:Name="BodyScroll" Margin="28,24,18,0"><StackPanel Margin="0,0,10,24">
+            <TextBlock x:Name="Heading" Text="准备备份文件与 DSH 程序" FontSize="26" FontWeight="SemiBold" LineHeight="36"/><TextBlock x:Name="Subtitle" Text="先找到以前保存的环境备份，再选择电脑上的 DSH 程序用于核验。" Style="{StaticResource Hint}" Margin="0,7,0,24"/>
+            <StackPanel x:Name="PageBackup">
+              <Border Style="{StaticResource Card}"><StackPanel>
+                <TextBlock Text="要恢复的环境备份" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Zip" ToolTip="{Binding Text,RelativeSource={RelativeSource Self}}" AutomationProperties.Name="要恢复的环境备份"/><Button x:Name="PickZip" Grid.Column="1" Content="选择备份文件" Margin="8,0,0,0"/></Grid>
+                <TextBlock Text="选择以前用「环境恢复包」保存的 .zip 文件，无需解压。只读检查不会修改它。" Style="{StaticResource Hint}" Margin="0,7,0,20"/>
+                <TextBlock Text="新 DSH 安装目录" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Runtime" ToolTip="{Binding Text,RelativeSource={RelativeSource Self}}" AutomationProperties.Name="新 DSH 安装目录"/><Button x:Name="PickRuntime" Grid.Column="1" Content="选择安装目录" Margin="8,0,0,0"/></Grid>
+                <TextBlock Text="选择包含 DeepSeek Harness.exe 与 resources 的安装目录。迁移依据实际功能、依赖和数据格式判断，不要求版本号相等。" Style="{StaticResource Hint}" Margin="0,7,0,8"/>
+                <TextBlock Text="选择 ZIP 和两个路径后生成计划。未知项目可检查并暂存验证；关键问题未验证时禁止完整提交。" Style="{StaticResource Hint}" Margin="0,0,0,18"/>
+                <TextBlock Text="新 Workspace 根目录（必须不存在，父目录已存在）" FontWeight="SemiBold" Margin="0,12,0,8"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="Target" ToolTip="{Binding Text,RelativeSource={RelativeSource Self}}" AutomationProperties.Name="新 Workspace 根目录"/><Button x:Name="PickParent" Grid.Column="1" Content="选择目录位置" Margin="8,0,0,0"/></Grid><Button x:Name="Check" Content="检查并生成计划" Style="{StaticResource Primary}" HorizontalAlignment="Left" IsEnabled="False"/>
+                <TextBlock x:Name="GateReason" Text="先选择备份文件并检查；恢复前还需核验匹配的 DSH 程序。" Style="{StaticResource Hint}" Margin="0,10,0,0"/>
+              </StackPanel></Border>
+              <TextBlock Text="检查结果" FontWeight="SemiBold" Margin="0,24,0,10"/>
+              <Border Style="{StaticResource Card}" Padding="16"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0"><TextBlock Text="存档完整性" Style="{StaticResource Hint}"/><TextBlock x:Name="Integrity" Text="待检查" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                <StackPanel Grid.Column="1" Margin="0,0,12,0"><TextBlock Text="恢复兼容性" Style="{StaticResource Hint}"/><TextBlock x:Name="Compatibility" Text="待检查" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="恢复后可用性" Style="{StaticResource Hint}"/><TextBlock Text="待启动验收" Foreground="{DynamicResource Muted}" Margin="0,5,0,0"/></StackPanel>
+              </Grid></Border>
+              <TextBlock x:Name="BackupInfo" Text="尚未读取备份信息" Style="{StaticResource Hint}" Margin="0,10,0,18"/>
+              <StackPanel Orientation="Horizontal" Margin="0,0,0,10"><Button x:Name="CoverageTab" Content="覆盖范围" Style="{StaticResource Quiet}" Padding="12,7" MinHeight="32" Background="{DynamicResource Soft}"/><Button x:Name="DetailsTab" Content="检查详情" Style="{StaticResource Quiet}" Padding="12,7" MinHeight="32" Margin="4,0,0,0"/></StackPanel>
+              <TextBox x:Name="Coverage" Text="检查后显示已收录范围、遗漏项和外部资源限制。" Height="170" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Background="{DynamicResource Layer}" BorderThickness="0" AutomationProperties.Name="备份覆盖范围"/>
+              <TextBox x:Name="Result" Text="尚未检查。" Visibility="Collapsed" Height="170" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Background="{DynamicResource Layer}" BorderThickness="0" AutomationProperties.Name="完整检查报告"/>
+            </StackPanel>
+            <StackPanel x:Name="PageTarget" Visibility="Collapsed">
+              <Border Style="{StaticResource Card}" Background="{DynamicResource Layer}"><StackPanel><TextBlock Text="已核验的恢复来源" Style="{StaticResource Hint}"/><TextBlock x:Name="Selection" TextWrapping="Wrap" Margin="0,6,0,0"/></StackPanel></Border>
+              <TextBlock Text="核对迁移计划" FontWeight="SemiBold" Margin="0,24,0,8"/>
+              <TextBlock Text="Home、Profile、agents 与必要数据目录将由计划自动安排。" Style="{StaticResource Hint}"/>
+              <TextBlock Text="新 Home 位于 Workspace 的同级独立数据目录，防止递归备份。" Style="{StaticResource Hint}" Margin="0,8,0,5"/>
+              <Button x:Name="StrictRestore" Content="打开 v0.5 严格恢复通道" HorizontalAlignment="Left" Margin="0,0,0,12"/><TextBlock x:Name="TargetFeedback" Text="选择已有父目录，填写其中尚不存在的新目录名。" Style="{StaticResource Hint}" Margin="0,0,0,24"/>
+              <Border Style="{StaticResource Card}" Background="{DynamicResource WarningBg}"><StackPanel><TextBlock Text="私人数据，请核对恢复范围" FontWeight="SemiBold"/><TextBlock Text="ZIP 未加密，可能包含凭据、私人 Prompt 和会话。只使用可信备份与完整工具包。外部工作区、模型及未收录资源需要另行准备。" Style="{StaticResource Hint}" Margin="0,8,0,0"/></StackPanel></Border>
+              <TextBlock Text="开始时会重新打开 ZIP，重新验证哈希、宿主证明、依赖和目标路径。此前预检不能替代执行前检查。" Style="{StaticResource Hint}" Margin="0,16,0,0"/>
+            </StackPanel>
+            <StackPanel x:Name="PageOutcome" Visibility="Collapsed">
+              <Border Style="{StaticResource Card}" Padding="24"><StackPanel>
+                <Border Width="52" Height="52" CornerRadius="14" Background="{DynamicResource Soft}" HorizontalAlignment="Left" Margin="0,0,0,18"><Path x:Name="OutcomeGlyph" Data="M 3,6 L 17,6 L 17,20 L 3,20 Z M 2,2 L 18,2 L 18,6 M 10,9 L 10,16 M 7,13 L 10,16 L 13,13" Stroke="{DynamicResource Ink}" StrokeThickness="1.5" Width="25" Height="27" Stretch="Uniform"/></Border>
+                <TextBlock x:Name="Outcome" Text="等待执行恢复" FontSize="22" FontWeight="SemiBold" LineHeight="32"/>
+                <TextBlock x:Name="OperationHint" Text="恢复文件后仍需启动 DSH 验收。" Style="{StaticResource Hint}" Margin="0,8,0,18"/>
+                <ProgressBar x:Name="Progress" IsIndeterminate="False" Value="0" AutomationProperties.Name="恢复阶段；整体百分比未知"/>
+                <TextBox x:Name="OperationDetails" Margin="0,20,0,0" MinHeight="100" MaxHeight="230" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Background="Transparent" BorderThickness="0" Padding="0" AutomationProperties.Name="恢复结果详情"/>
+              </StackPanel></Border>
+              <StackPanel x:Name="Startup" Margin="0,24,0,0"><TextBlock Text="接下来，验证新环境" FontWeight="SemiBold"/><TextBlock Text="01   使用新 DSH_HOME 和独立 agents 目录启动匹配的 DSH。" Style="{StaticResource Hint}" Margin="0,12,0,0"/><TextBlock Text="02   检查插件、配置、会话及外部文件。" Style="{StaticResource Hint}" Margin="0,8,0,0"/><TextBlock Text="03   正常关闭并重启，确认数据持久化。" Style="{StaticResource Hint}" Margin="0,8,0,0"/><TextBlock Text="文件校验通过不等于业务恢复通过。助手不会自动启动 DSH 或迁移到正式环境。" Style="{StaticResource Hint}" Margin="0,16,0,0"/></StackPanel>
+            </StackPanel>
+          </StackPanel></ScrollViewer>
+          <Border Grid.Row="1" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="28,16"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <CheckBox x:Name="Confirm" Grid.ColumnSpan="4" Margin="0,0,0,16" Visibility="Collapsed" AutomationProperties.Name="确认私人恢复"><TextBlock Text="我确认将私人备份恢复到上方新文件夹，不使用正式 Home。"/></CheckBox>
+            <Button x:Name="Back" Grid.Row="1" Content="返回" Style="{StaticResource Quiet}" Visibility="Collapsed"/><Button x:Name="Close" Grid.Row="1" Grid.Column="2" Content="关闭" Style="{StaticResource Quiet}"/>
+            <Button x:Name="Next" Grid.Row="1" Grid.Column="3" Content="继续" Style="{StaticResource Primary}" Margin="10,0,0,0" IsEnabled="False" ToolTip="{Binding Text,ElementName=GateReason}" ToolTipService.ShowOnDisabled="True"/>
+            <Button x:Name="Restore" Grid.Row="1" Grid.Column="3" Content="开始恢复" Style="{StaticResource Primary}" Margin="10,0,0,0" IsEnabled="False" Visibility="Collapsed"/>
+          </Grid></Border>
+        </Grid>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

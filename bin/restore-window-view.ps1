@@ -1,7 +1,7 @@
 ﻿# WPF presentation; the original Node verifier and restorer remain authoritative.
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase,System.Xaml
-function New-PackerRestoreView {
-  $xaml=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'restore-window.xaml') -Raw -Encoding UTF8
+function New-PackerRestoreView([string]$XamlFile='restore-window.xaml') {
+  $xaml=Get-Content -LiteralPath (Join-Path $PSScriptRoot $XamlFile) -Raw -Encoding UTF8
   $window=[Windows.Markup.XamlReader]::Parse($xaml)
   $names=@{zip='Zip';runtime='Runtime';target='Target';pickZip='PickZip';pickRuntime='PickRuntime';pickParent='PickParent';check='Check';result='Result';confirm='Confirm';restore='Restore';close='Close';progress='Progress';next='Next';back='Back';heading='Heading';subtitle='Subtitle';integrity='Integrity';compatibility='Compatibility';coverage='Coverage';backupInfo='BackupInfo';selection='Selection';targetFeedback='TargetFeedback';outcome='Outcome';operationHint='OperationHint';operationDetails='OperationDetails';startup='Startup';glyph='OutcomeGlyph';scroll='BodyScroll';closeCaption='CloseCaption';minimize='Minimize';maximize='Maximize';stepBackup='StepBackup';stepTarget='StepTarget';stepResult='StepResult';coverageTab='CoverageTab';detailsTab='DetailsTab';gateReason='GateReason'}
   $view=@{form=$window;page=0;Busy=$false;Inspection=$null;Phase='idle';HasAttempted=$false}

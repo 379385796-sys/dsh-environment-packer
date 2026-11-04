@@ -1,6 +1,6 @@
 # DSH Environment Packer
 
-> This branch is the **unpublished v0.6.0 Phase 2 candidate**. See [the migration channel guide](docs/MIGRATION.md) for the new archive and two-path recovery. The v0.5.0 download and steps below describe the published baseline, not a release of this candidate. Strict restore retains its original rules.
+> This branch is the **unpublished v0.6.0 Phase 3 candidate**. See [the migration channel guide](docs/MIGRATION.md) for the new archive and two-path recovery. The v0.5.0 download and steps below describe the published baseline, not a release of this candidate. Strict restore retains its original rules.
 
 [简体中文](README.md) · [Download v0.5.0](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.5.0) · [Restore guide](docs/RESTORE.md) · [Compatibility](docs/COMPATIBILITY.md)
 

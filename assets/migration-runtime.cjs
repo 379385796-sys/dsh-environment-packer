@@ -44,6 +44,11 @@ async function run(request){
   try{
     await application.ctx.get('loader')?.await();
     const checks=[];for(const expected of request.expectedStorage||[])if(expected.critical&&!observedStorage.has(expected.name))throw Error('STORAGE_OWNER_UNAVAILABLE');if(request.expectedStorage?.length)checks.push('actual-storage-schema-and-records');
+    if(request.expectedSessionIds?.length){
+      const persistence=application.ctx.get('sessionPersistence');if(!persistence)throw Error('SESSION_OWNER_UNAVAILABLE');
+      for(const id of request.expectedSessionIds){if(typeof id!=='string')throw Error('SESSION_OWNER_UNVERIFIED');const handle=await persistence.open(id,'read');try{await handle.read();}finally{await handle.close();}}
+      checks.push('actual-session-owner-read');
+    }
     // rc.5 Web/Desktop mounts filesystem skills inside Agent preset scopes, not in the root registry.
     // Exercise the target's real filesystem provider without changing the recovered preset composition.
     if(request.expectedSkills?.length){
@@ -51,9 +56,8 @@ async function run(request){
       const provider=new FileSystemSkillProvider(application.ctx,{invalidate(){},signal:lifetime.signal},{providerName:'packer-verification',watch:false,dshHome:layout.home,agentsHome:layout.agents});
       try{for(const expected of request.expectedSkills){const listed=await provider.list({cwd:expected.cwd}),candidate=(Array.isArray(listed)?listed:listed.candidates).find(c=>c.name===expected.name),definition=candidate&&await provider.get(candidate,{signal:lifetime.signal});if(!definition||require('./recovery-core.cjs').sha(Buffer.from(definition.content))!==expected.bodySHA256)throw Error('SKILL_BUSINESS_READ_FAILED');checks.push('skill-body-read');}}finally{lifetime.abort();await provider.dispose();}
     }
-    if(request.requiresPreferenceImport){const injections=application.ctx.get('webServer')?.collectIndexInjections()||[];if(!injections.some(row=>row.kind==='script'&&row.text?.includes('dsh-packer.preference-import.')))throw Error('CLIENT_PREFERENCE_IMPORT_UNVERIFIED');checks.push('known-preference-bootstrap');}
     process.send?.({type:'data-verified',checks});
   }catch(e){const code=/^[A-Z0-9_]+$/.test(e.message)?e.message:'RUNTIME_DATA_VALIDATION_FAILED';console.error(code);process.send?.({type:'failed',code});await application.shutdown.shutdown(1);if(process.connected)process.disconnect();throw e;}
 }
-if(require.main===module){run(JSON.parse(Buffer.from(process.argv[2],'base64'))).catch(e=>{process.send?.({type:'failed',code:/^[A-Z_]+$/.test(e.message)?e.message:'RUNTIME_BOOT_FAILED'});console.error('RUNTIME_BOOT_FAILED');process.exitCode=1;});}
+if(require.main===module){run(JSON.parse(Buffer.from(process.argv[2],'base64'))).catch(e=>{process.send?.({type:'failed',code:/^[A-Z_]+$/.test(e.message)?e.message:'RUNTIME_BOOT_FAILED'},()=>{});console.error('RUNTIME_BOOT_FAILED');process.exitCode=1;});}
 module.exports={run};

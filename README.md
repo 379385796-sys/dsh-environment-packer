@@ -1,6 +1,6 @@
 # DSH Environment Packer
 
-> 当前开发分支是 **v0.6.0 Phase 2 未发布候选**。新增完整环境迁移归档、两个路径的独立恢复及真实启动验证，使用方法与安全边界见 [迁移通道说明](docs/MIGRATION.md)。旧 strict-restore 保持原语义。下方 v0.5.0 下载、校验及旧恢复步骤记录的是已发布基线，不是本分支的发布声明。正式环境尚未安装本候选。
+> 当前开发分支是 **v0.6.0 Phase 3 未发布候选**。新增完整环境迁移归档、两个路径的独立恢复及真实启动验证，使用方法与安全边界见 [迁移通道说明](docs/MIGRATION.md)。旧 strict-restore 保持原语义。下方 v0.5.0 下载、校验及旧恢复步骤记录的是已发布基线，不是本分支的发布声明。正式环境尚未安装本候选。
 
 [English](README.en.md) · [下载 v0.5.0](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.5.0) · [恢复指南](docs/RESTORE.zh-CN.md) · [兼容范围](docs/COMPATIBILITY.md)
 

@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),z=require('node:zlib');
+const A=require('../assets/migration-data.cjs');
+const root=process.env.DSH_PACKER_TEST_ROOT;if(!root||!path.isAbsolute(root))throw Error('Explicit isolated root required');
+const cwd='C:\\OldUser\\Workspace',map=[{from:cwd,to:path.join(root,'new workspace')}],header={type:'session',version:4,id:'00000000-0000-4000-8000-000000000004',cwd};
+const literal=Buffer.from(JSON.stringify({type:'synthetic-literal',text:'keep '+cwd})+'\n'),event=Buffer.from(JSON.stringify({type:'working-directory/change',seq:1,time:2,data:{cwd:cwd+'\\child'}})+'\n');
+const encode=b=>z.zstdCompressSync(b,{params:{[z.constants.ZSTD_c_checksumFlag]:1}});
+const source=Buffer.concat([encode(Buffer.from(JSON.stringify(header)+'\n')),encode(Buffer.concat([literal,event]))]);
+assert(A.decodeSession(source,'session.v4.jsonl.zstd').body.equals(Buffer.concat([literal,event])),'all source frames decoded on actual Desktop Node');
+const converted=A.transformSession(source,'session.v4.jsonl.zstd',map),head=Buffer.from(JSON.stringify(converted.header)+'\n'),first=encode(head),tail=converted.data.subarray(first.length);
+assert(converted.data.subarray(0,first.length).equals(first),'first Zstandard frame contains only the header');
+const body=z.zstdDecompressSync(tail);assert(body.subarray(0,literal.length).equals(literal),'non-path event bytes stay exact');
+assert.equal(JSON.parse(body.subarray(literal.length).toString()).data.cwd,path.join(root,'new workspace','child'));
+const empty=A.transformSession(encode(Buffer.from(JSON.stringify(header)+'\n')),'session.v4.jsonl.zstd',map);assert(empty.data.equals(encode(Buffer.from(JSON.stringify(empty.header)+'\n'))));
+const plain=A.transformSession(Buffer.concat([Buffer.from(JSON.stringify(header)+'\n'),literal,event]),'session.v4.jsonl',map);assert.equal(A.decodeSession(plain.data,'session.v4.jsonl').header.cwd,map[0].to);
+const corrupt=Buffer.from(source);corrupt[corrupt.length-1]^=1;assert.throws(()=>A.decodeSession(corrupt,'session.v4.jsonl.zstd'),e=>e.code==='SESSION_DECODE_FAILED');
+fs.writeFileSync(path.join(root,'session-framing-result.json'),JSON.stringify({status:'PASS',node:process.versions.node,checks:['all source frames decoded','header isolated in first Zstandard frame','non-path bytes preserved','structured cwd mapped','header-only archive has one frame','plain JSONL remains supported','corrupt later frame refused']},null,2));console.log('PASS session framing: 7 checks');

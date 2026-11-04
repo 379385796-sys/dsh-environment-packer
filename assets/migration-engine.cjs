@@ -86,7 +86,7 @@ async function boot(p,round,{onReady,port=0}={}){
   const file=path.join(p.layout.state,'logs','runtime-'+round),out=fs.openSync(file+'.stdout.log','wx',0o600),err=fs.openSync(file+'.stderr.log','wx',0o600);
   let child,output='',errorOutput='',ready,loaded=false,dataVerified=false,dataChecks=[],exited=false,exitCode;
   try{
-    child=spawn(p.host.exe,['--expose-internals',path.join(__dirname,'migration-runtime.cjs'),Buffer.from(JSON.stringify({layout:p.layout,installation:p.host.installation,native:p.native,tools:p.tools,port,expectedSkills:p.expectedSkills||[],expectedStorage:p.expectedStorage||[],requiresPreferenceImport:p.requiresPreferenceImport===true})).toString('base64')],{cwd:p.layout.workspace,env:childEnvironment(p),windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
+    child=spawn(p.host.exe,['--expose-internals',path.join(__dirname,'migration-runtime.cjs'),Buffer.from(JSON.stringify({layout:p.layout,installation:p.host.installation,native:p.native,tools:p.tools,port,expectedSkills:p.expectedSkills||[],expectedStorage:p.expectedStorage||[],expectedSessionIds:(p.datasets||[]).filter(d=>d.adapter==='session-v4').map(d=>d.sessionId),requiresPreferenceImport:p.requiresPreferenceImport===true})).toString('base64')],{cwd:p.layout.workspace,env:childEnvironment(p),windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
     child.stdout.on('data',b=>{fs.writeSync(out,b);output+=b.toString();const m=output.match(/dsh web: (http:\/\/[^\s]+)/);if(m)ready=m[1];});child.stderr.on('data',b=>{fs.writeSync(err,b);errorOutput+=b.toString();});child.on('message',m=>{if(m?.type==='native-loaded')loaded=true;if(m?.type==='data-verified'){dataVerified=true;dataChecks=m.checks||[];}if(m?.type==='failed')errorOutput+='\n'+m.code;});
     child.on('exit',c=>{exited=true;exitCode=c;});let spawnError;child.on('error',e=>{spawnError=e;});
     const deadline=Date.now()+60000;while(!ready||!dataVerified){if(spawnError||exited)C.fail('RUNTIME_BOOT_FAILED');if(Date.now()>deadline)C.fail('RUNTIME_BOOT_TIMEOUT');await new Promise(r=>setTimeout(r,100));}
@@ -95,6 +95,7 @@ async function boot(p,round,{onReady,port=0}={}){
     const cookie=homepage.headers.getSetCookie().map(v=>v.split(';')[0]).join('; '),headers=cookie?{cookie}:{};
     if(homepage.status>=300&&homepage.status<400){const to=new URL(homepage.headers.get('location'),url);if(to.origin!==url.origin)C.fail('RUNTIME_NONLOCAL_URL');homepage=await fetch(to,{headers,signal:AbortSignal.timeout(10000)});}
     if(!homepage.ok)C.fail('RUNTIME_WEB_FAILED');
+    if(p.requiresPreferenceImport){const html=await homepage.text();if(!html.includes('dsh-packer.preference-import.')||!html.includes(p.planId))C.fail('CLIENT_PREFERENCE_IMPORT_UNVERIFIED');dataChecks.push('known-preference-bootstrap');}
     if(onReady)await onReady({url:ready,headers,layout:p.layout});
     const checks=['real-target-host-ready','web-http-ready','native-loads',...dataChecks];
     for(const plugin of p.plugins.filter(x=>!x.path.slice(0,-13).includes('/node_modules/',x.path.indexOf('/node_modules/')+14))){

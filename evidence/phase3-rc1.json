@@ -1,0 +1,71 @@
+{
+  "baseline": "37ba267efb88c5f655a899b9698632a07aae66ec",
+  "hosts": {
+    "source": "0.2.1-rc.5",
+    "target": "0.2.2-rc.1",
+    "node": "24.21.0",
+    "electron": "44.7.0",
+    "abi": "149",
+    "cordisSource": "4.0.5",
+    "cordisTarget": "4.1.0"
+  },
+  "results": [
+    {
+      "name": "framing",
+      "file": "evidence/session-framing-result.json",
+      "status": "PASS",
+      "sha256": "0291906048f2b38e893693d6230f7e8b2b09ba36aa9c5f961a64323608073eb9"
+    },
+    {
+      "name": "sqlite",
+      "file": "evidence/sqlite-extension-result.json",
+      "status": "PASS",
+      "sha256": "0e34895df7333606de8b42dafad6827234e7e4207bad604b1948330e728d7d18"
+    },
+    {
+      "name": "contracts",
+      "file": "evidence/migration-contracts-result.json",
+      "status": "PASS",
+      "sha256": "2d19a9c5cc5c9f80eb7c599bdff7237897c80139235a1fd296e2bb5d586bbc2a"
+    },
+    {
+      "name": "cross-version",
+      "file": "integration-5/result.json",
+      "status": "PASS",
+      "sha256": "14ec0ebc6e555d6eadd75d511081df86f623ec3d5c22521721742075ed285df5"
+    },
+    {
+      "name": "runtime-gates",
+      "file": "runtime-gates/result.json",
+      "status": "PASS",
+      "sha256": "e0c726bd13d185c81dc71bdb865391a95bc3dd642981b950bbb43157e54b9fb6"
+    },
+    {
+      "name": "candidate",
+      "file": "evidence/candidate-smoke.json",
+      "status": "PASS",
+      "sha256": "1b220283a1c3f3c82cff487eed3b67be3e91bac84f1304353eab094f7dafb0e5"
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "dsh-environment-packer-0.6.0.tgz",
+      "bytes": 246967,
+      "sha256": "f58ef601759baeb2a137c716ae9701d05e19e38249f30a88db32faa36cf05edc"
+    },
+    {
+      "file": "Packer-v0.6.0-Standalone-Recovery-Candidate.zip",
+      "bytes": 311526,
+      "sha256": "597f754207b78c83abfe3852a3df1cce79a26190208f6ce5c36afb8dec4e2c14"
+    }
+  ],
+  "toolkitFilesVerified": 136,
+  "protectedContentChecks": 8,
+  "formalWritesAuthorized": false,
+  "limits": [
+    "Native Mnemon/real 17-plugin combinations not certified",
+    "Headless browser failed Windows directory initialization; rc1 settings DOM not verified",
+    "100%/150% DPI acceptance not repeated; Phase2.5 limits retained"
+  ],
+  "noVmOrNewHostDeployment": true
+}

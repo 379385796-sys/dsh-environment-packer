@@ -11,7 +11,16 @@ function projectKey(cwd) {
   return '--'+(readable.replace(/^-+/,'')||'root').slice(0,251)+'--';
 }
 function decodeSession(bytes,name){
-  let plain;try{plain=name.endsWith('.zstd')?zlib.zstdDecompressSync(bytes,{maxOutputLength:C.MAX_FILE}):bytes;}catch{C.fail('SESSION_DECODE_FAILED');}
+  let plain;try{
+    if(name.endsWith('.zstd')){
+      const chunks=[];let offset=0,total=0;
+      while(offset<bytes.length){const decoded=zlib.zstdDecompressSync(bytes.subarray(offset),{maxOutputLength:C.MAX_FILE-total,info:true}),used=decoded.engine.bytesWritten;
+        if(!Number.isSafeInteger(used)||used<=0||used>bytes.length-offset)C.fail('SESSION_DECODE_FAILED');
+        total+=decoded.buffer.length;if(total>C.MAX_FILE)C.fail('SESSION_DECODE_FAILED');chunks.push(decoded.buffer);offset+=used;
+      }
+      plain=Buffer.concat(chunks,total);
+    }else plain=bytes;
+  }catch{C.fail('SESSION_DECODE_FAILED');}
   const end=plain.indexOf(10);if(end<0)C.fail('SESSION_HEADER_INVALID');let header;try{header=JSON.parse(plain.subarray(0,end).toString('utf8'));}catch{C.fail('SESSION_HEADER_INVALID');}
   if(header.type!=='session'||!Number.isSafeInteger(header.version)||typeof header.id!=='string'||(header.cwd!==undefined&&!path.win32.isAbsolute(header.cwd)))C.fail('SESSION_HEADER_INVALID');
   return {header,body:plain.subarray(end+1)};
@@ -79,8 +88,9 @@ function transformSession(bytes,name,map){
   const chunks=[];let offset=0;while(offset<body.length){let end=body.indexOf(10,offset);if(end<0)end=body.length;const raw=body.subarray(offset,end),newline=end<body.length?Buffer.from('\n'):Buffer.alloc(0);let row;try{row=JSON.parse(raw.toString('utf8'));}catch{if(raw.length)C.fail('SESSION_EVENT_INVALID');}
     if(row?.type==='working-directory/change'){if(typeof row.data?.cwd!=='string')C.fail('SESSION_EVENT_SCHEMA_UNKNOWN');row.data.cwd=mapPath(row.data.cwd,map);chunks.push(Buffer.from(JSON.stringify(row)),newline);}else chunks.push(raw,newline);offset=end+1;
   }
-  const plain=Buffer.concat([Buffer.from(JSON.stringify(header)+'\n'),...chunks]);
-  const data=name.endsWith('.zstd')?zlib.zstdCompressSync(plain,{params:{[zlib.constants.ZSTD_c_checksumFlag]:1}}):plain;
+  const head=Buffer.from(JSON.stringify(header)+'\n'),events=Buffer.concat(chunks);
+  const compress=bytes=>zlib.zstdCompressSync(bytes,{params:{[zlib.constants.ZSTD_c_checksumFlag]:1}});
+  const data=name.endsWith('.zstd')?Buffer.concat([compress(head),...(events.length?[compress(events)]:[])]):Buffer.concat([head,events]);
   return {data,header,old,bodySHA256:C.sha(body)};
 }
 function sessionPaths(bytes,name){const {header,body}=decodeSession(bytes,name),paths=header.cwd?[header.cwd]:[];if(header.version!==4)return paths;for(const line of body.toString('utf8').split('\n'))if(line.trim()){let row;try{row=JSON.parse(line);}catch{C.fail('SESSION_EVENT_INVALID');}if(row.type==='working-directory/change'){if(typeof row.data?.cwd!=='string'||!path.win32.isAbsolute(row.data.cwd))C.fail('SESSION_EVENT_SCHEMA_UNKNOWN');paths.push(row.data.cwd);}}return [...new Set(paths)];}

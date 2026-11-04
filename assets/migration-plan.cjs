@@ -43,7 +43,7 @@ async function scanData(arc){
   for(const f of files){
     if(f.path.startsWith('home-data/sessions/')&&/\.jsonl(?:\.zstd)?$/.test(f.path)){
       const bytes=get(arc,f),{header}=A.decodeSession(bytes,f.path);for(const cwd of A.sessionPaths(bytes,f.path))workspace(cwd);
-      datasets.push({path:f.path,adapter:'session-v4',version:header.version,state:header.version===4?'converted':'unknown',critical:true});if(header.version!==4)issues.push({code:'SESSION_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
+      datasets.push({path:f.path,adapter:'session-v4',sessionId:header.id,version:header.version,state:header.version===4?'converted':'unknown',critical:true});if(header.version!==4)issues.push({code:'SESSION_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
     }
     if(f.path==='home-data/storages/workspace.json'){
       let j;try{j=JSON.parse(get(arc,f));}catch{C.fail('WORKSPACE_SCHEMA_UNKNOWN');}
@@ -57,7 +57,7 @@ async function scanData(arc){
       for(const e of A.entries(tree))if(e.id==='prompt-inject')Object.keys(e.config.workspaceOverrides||{}).forEach(workspace);
       for(const r of A.unknownConfigPaths(tree,{mnemonTool:(arc.manifest.tools||[]).some(t=>t.name==='mnemon')}))issues.push({code:'UNMAPPED_EXTERNAL_PATH_FIELD',owner:r.owner,key:r.key,state:'unknown',critical:true});
     }
-    if(/\.db$/.test(f.path)&&!f.path.includes('/node_modules/')){
+    if(/\.(?:db|sqlite|sqlite3)$/i.test(f.path)&&!f.path.includes('/node_modules/')){
       const known=A.sqliteHeader(get(arc,f))&&f.path.endsWith('/mnemon.db')&&(arc.manifest.tools||[]).some(t=>t.name==='mnemon');datasets.push({path:f.path,adapter:'sqlite-preserve',state:known?'requires-owner-validation':'unknown',critical:true});if(!known)issues.push({code:'DATABASE_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
     }
     if(f.path.startsWith('preferences/')){try{const pref=JSON.parse(get(arc,f));if(f.path!=='preferences/dsh-chat-comfort.settings.v1.json'||pref.key!=='dsh-chat-comfort.settings.v1')throw Error();A.knownPreference(pref.value);}catch{issues.push({code:'PREFERENCE_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});}}

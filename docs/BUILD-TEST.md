@@ -27,3 +27,7 @@ Build the console-free managed launcher from the shipped C# source/manifest usin
 ## Immutable release artifact
 
 The v0.5.0 Release retains the exact accepted and installed tgz (SHA-256 `b301efa06bcb2b589e382c5a7c20ee07292e9899b4f34a452e1fd6faac84db11`). Public README, screenshots and release documentation were finalized afterwards; they are not a newly repacked same-version artifact. Executable resources, launcher, manifest and vendor bytes match the accepted package. A future npm pack from this documentation commit will therefore not reproduce the accepted tgz. Do not replace the released artifact with that output.
+
+## v0.6.0 release artifact
+
+The runtime code is pinned to ae441043444491c2bfb1e0b67cafc5da453bb1fc. The user approved a documentation-only repackage for the final 0.6.0 README/links. All 132 non-document package files remain byte-identical to the accepted candidate; no functional executable was recompiled. Exact published attachment hashes are recorded in RELEASE-0.6.0.md and GitHub Release. Source documentation can evolve after artifact acceptance; do not silently replace an already released same-version archive.

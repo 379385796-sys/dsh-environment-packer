@@ -1,4 +1,4 @@
-# v0.6.0 migration channel (Phase 2 candidate, unpublished)
+# v0.6.0 migration channel
 
 This channel is independent of the unchanged `recovery/2` and `recovery/3` strict-restore implementation. Keep the complete tool directory and a trusted DSH installation. The assistant works without starting the ordinary DSH desktop first; target runtime inspection still requires its executable. No AI, download, installer, or installation lifecycle hook is used by recovery.
 
@@ -34,9 +34,9 @@ The runtime verification guard restricts outbound connections, subprocesses and 
 
 ## Validated scope
 
-Phase 2 uses the installed Windows x64 Desktop `0.2.1-rc.5` and isolated synthetic data. Controlled fixtures test version differences and rejection branches; they do not certify unavailable future installers or every plugin in a user's formal Profile. See the separately delivered Phase 2 result and retained evidence for exact passing cases. Phase 2.5 UI work has been accepted; release still requires user confirmation.
+Phase 2 uses the installed Windows x64 Desktop `0.2.1-rc.5` and isolated synthetic data. Controlled fixtures test version differences and rejection branches; they do not certify unavailable future installers or every plugin in a user's formal Profile. See the separately delivered Phase 2 result and retained evidence for exact passing cases. Phase 2.5 UI work has been accepted; the release preserves the documented validation limits.
 
-## Phase 3 candidate: actual rc.1 validation
+## Actual rc.1 validation
 
 Windows x64 `0.2.1-rc.5` to `0.2.2-rc.1` has been exercised with isolated synthetic data and trusted test plugins. Node 24.21.0 / ABI 149 / Electron 44.7.0 are unchanged; the actual Cordis provider changes from 4.0.5 to 4.1.0. This is not certification of the user's 17 real plugins or their native modules.
 

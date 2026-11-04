@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 — Phase 3 unpublished candidate
+## 0.6.0 — 2026-11-05
 
 - Add the independent format-4 environment migration channel, manifest coverage, external memory/Skills and original package provenance capture, and typed rc.5 path/data adapters. Keep strict recovery/2 and recovery/3 compatibility rules unchanged.
 - Share deterministic inspect/plan/apply/verify/commit/rollback between the functional WPF assistant and CLI. Bind archive, target/runtime, directories and toolkit; stage fresh sibling Home/Workspace roots and enable activation only after runtime verification and normal restart.
@@ -8,7 +8,7 @@
 - Unify the plugin page and standalone helpers; keep cold-backup actions visible in a fixed, DPI-aware window and retain the Phase 2.5 paint/performance fixes.
 - Validate rc.5 to rc.1 migration with synthetic data on actual Windows x64 hosts. Read the real authenticated HTTP preference bootstrap instead of calling the request-dependent internal index-injection API.
 - Decode every Zstandard session frame on Desktop Node 24, preserve independent header/event framing, and require target session-owner reads before commit. Classify .sqlite/.sqlite3 data as critical unknowns until validated.
-- This candidate is not published. Real third-party/native plugin combinations, native Mnemon business migration and arbitrary future hosts are not certified. Release still requires user confirmation.
+- Publish the accepted runtime code with concise in-app documentation and complete GitHub guides. Real third-party/native plugin combinations, native Mnemon business migration, settings DOM automation, real 150% DPI and arbitrary future hosts remain uncertified.
 
 ## 0.5.0 — 2026-11-02
 

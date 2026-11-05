@@ -35,7 +35,7 @@ if (!isMainThread) {
       }});
     if (!result.cleanup.tempRemoved) fail('BACKUP_CLEANUP_FAILED');
     // Core already verified all entry names, CRCs, manifest and payload hashes before commit.
-    parentPort.postMessage({done:true,files:result.files,bytes:result.bytes,sha256:result.sha256,verified:true,cleanup:true});
+    parentPort.postMessage({done:true,files:result.files,bytes:result.bytes,sha256:result.sha256,verified:true,cleanup:true,dependencyIssues:result.dependencyIssueCount??0});
   } catch(e) { parentPort.postMessage({error:/^[A-Z0-9_]+$/.test(e.code||'')?e.code:'BACKUP_FAILED'}); }
 } else {
   let dir,job,heartbeat,monitor,worker,guard,owns=false,terminal,asyncFailure,bits,backupTimer;
@@ -113,7 +113,7 @@ if (!isMainThread) {
         if(m.phase) phase=m.phase;
         if(m.files!==undefined) files=m.files;
         if(m.error) {finished=true;reject(Object.assign(new Error(m.error),{code:gateFailure||m.error}));}
-        else if(m.done) {finished=true;if(gateFailure||asyncFailure)reject(Object.assign(new Error(),{code:gateFailure||asyncFailure}));else {terminal={id:job.id,phase:'success',files:m.files,bytes:m.bytes,sha256:m.sha256,verified:m.verified,cleanup:m.cleanup,at:Date.now()};resolve();}}
+        else if(m.done) {finished=true;if(gateFailure||asyncFailure)reject(Object.assign(new Error(),{code:gateFailure||asyncFailure}));else {terminal={id:job.id,phase:'success',files:m.files,bytes:m.bytes,sha256:m.sha256,verified:m.verified,cleanup:m.cleanup,dependencyIssues:m.dependencyIssues??0,target:job.target,at:Date.now()};resolve();}}
         else if(m.phase) status();
         }catch(e){finished=true;asyncFailure=codeOf(e);Atomics.store(bits,0,1);reject(e);}
       });
@@ -121,7 +121,7 @@ if (!isMainThread) {
       worker.on('exit',()=>{if(!finished)reject(Object.assign(new Error('BACKUP_WORKER_FAILED'),{code:'BACKUP_WORKER_FAILED'}));});
     });
   } catch(e) {
-    terminal=job?{id:job.id,phase:'failed',files:0,error:codeOf(e),at:Date.now()}:undefined;
+    terminal=job?{id:job.id,phase:'failed',files:0,error:codeOf(e),target:job.target,at:Date.now()}:undefined;
     diagnostic('failed',codeOf(e));
     process.exitCode=1;
   } finally {

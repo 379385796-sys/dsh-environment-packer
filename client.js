@@ -29,8 +29,9 @@ window.__ModuleLoader__.load({
       TARGET_PARENT_MISSING:'目标文件夹必须已经存在。',
       TARGET_INSIDE_SOURCE:'ZIP 不能保存在正在备份的 DSH_HOME 内。',
       HOT_BACKUP_DISABLED:'运行中完整备份已停用，请使用离线备份。',
-      HOST_BROWSER_PEER_UNPROVEN:'浏览器 peer 的版本、来源或运行时兼容性证据不足。备份未启动；请保留依赖诊断，完成兼容性核验后再试，不能跳过检查。',
-      TRANSITIVE_DEPENDENCY_MISSING:'传递依赖检查未通过。请保留诊断并核验缺失项、版本及宿主来源；修复后使用新 ZIP 名称重试。'
+      HOST_BROWSER_PEER_UNPROVEN:'浏览器 peer 的版本、来源或运行时兼容性证据不足。recovery/4 会记录该冲突并允许归档；恢复计划会重新检查，未解决的关键问题不能提交。',
+      PEER_VERSION_MISMATCH:'依赖版本不满足声明要求。recovery/4 会记录真实冲突并允许归档；恢复计划会重新检查，未解决的关键问题不能提交。',
+      TRANSITIVE_DEPENDENCY_MISSING:'传递依赖检查未通过。recovery/4 会保留真实冲突并允许归档；恢复计划会重新检查缺失项、版本及宿主来源，未解决的关键问题不能提交。'
     };
     const css = `
 .ep{font:inherit;color:var(--dsw-alias-label-primary,CanvasText);line-height:1.6;min-width:0;container:packer / inline-size;--ep-muted:var(--dsw-alias-label-secondary,GrayText);--ep-subtle:var(--dsw-alias-label-tertiary,GrayText);--ep-line:var(--dsw-alias-border-l2,ButtonBorder);--ep-layer:var(--dsw-alias-bg-layer-2,Canvas);--ep-accent:var(--dsw-alias-brand-primary,Highlight);--ep-warn:var(--dsw-alias-state-warn-primary,CanvasText);--ep-error:var(--dsw-alias-state-error-primary,CanvasText)}
@@ -77,15 +78,25 @@ window.__ModuleLoader__.load({
 
 
       const overview=defaults?.taskOverview;
-      const phaseNames={waiting:'等待正常退出与人工确认','exit-verified':'退出检查通过',scanning:'扫描文件','checking-dependencies':'检查依赖',writing:'生成备份',verifying:'验证 ZIP',success:'文件完整性通过，恢复业务未确认',failed:'失败或已取消',unknown:'结果未知'};
+      const fmtBytes=n=>typeof n!=='number'||!Number.isFinite(n)||n<0?'':n>=1073741824?(n/1073741824).toFixed(2)+' GB':n>=1048576?(n/1048576).toFixed(1)+' MB':n>=1024?(n/1024).toFixed(0)+' KB':n+' B';
+      const fmtTime=ms=>{try{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}catch{return '';}};
+      const phaseNames={waiting:'等待正常退出与人工确认','exit-verified':'退出检查通过',scanning:'扫描文件','checking-dependencies':'检查依赖',writing:'生成备份',verifying:'验证 ZIP',success:'备份成功（文件完整性通过；恢复业务未验证）',failed:'失败或已取消',unknown:'结果未确认'};
       const recorded=overview?.current?.diagnostic?overview.current:overview?.history?.find(t=>t.diagnostic);
       const diagnostic=recorded?.diagnostic;
       const tone=busy||/独立助手已接管任务/.test(message)?'running':/已安全恢复|已经安全退役|当前没有阻止/.test(message)?'success':/失败|损坏|未通过|拒绝|无法|未启动|证据不足/.test(message)?'error':message?'warning':'unknown';
       const stateLabel={running:'执行中',success:'检查完成',error:'需要处理',warning:'请确认',unknown:'尚未检查'}[tone];
       const navigate=(name,text)=>h('button',{type:'button',className:'ep-link',onClick:()=>setTab(name)},text,icon('chevron'));
-      const taskLine=task=>h('div',{key:task.id,className:'ep-record'},h('strong',null,task.record==='corrupt'?'状态记录损坏，结果未知':phaseNames[task.phase]||'结果未知'),h('p',{className:'ep-path'},task.id),h('p',null,task.files===null?'文件计数未记录':`已处理 ${task.files} 个文件`,task.error?` · ${task.error}`:''));
+      const outcomeLabel=task=>{const o=task.result?.outcome;return o==='success'?'备份成功':o==='cancelled'?'已取消':o==='failed'?'备份失败':o==='unknown'?'结果未确认':task.record==='corrupt'?'状态记录损坏，结果未知':phaseNames[task.phase]||'结果未知';};
+      const taskLine=task=>{const r=task.result||null,size=r?fmtBytes(r.bytes):'',when=r?.completedAt?fmtTime(r.completedAt):'';
+        return h('div',{key:task.id,className:'ep-record'},h('strong',null,outcomeLabel(task)),
+          h('p',{className:'ep-path'},r?.target||task.id),
+          h('p',null,[when?`完成 ${when}`:'',size?`大小 ${size}`:'',r&&r.files!==null&&r.files!==undefined?`${r.files} 个文件`:''].filter(Boolean).join(' · ')||`任务 ${task.id}`),
+          r?.sha256?h('p',{className:'ep-path'},`SHA-256 ${r.sha256}`):null,
+          r?.outcome==='success'?h('p',null,r.integrity==='verified'?'完整性：ZIP 结构、CRC、清单与全部载荷哈希通过':'完整性：未确认'):null,
+          r?.outcome==='success'&&r.dependencyIssues>0?h('p',null,`依赖冲突 ${r.dependencyIssues} 项已记录；恢复时重新检查。`):null,
+          task.error&&r?.outcome!=='success'?h('p',null,`错误码 ${task.error}`):null);};
       const snapshotText=overview?.state==='lock-present'?'有任务记录，需确认是否结束':overview?.state==='corrupt'?'任务锁信息损坏，需检查安全恢复':overview?.state==='no-lock'||overview?.state==='no-records'?'本次备份尚未开始':'任务状态未知，请检查或刷新记录';
-      const compatibility=diagnostic?h('div',{className:'ep-notice',role:'note'},diagnostic.unavailable?'保留的依赖诊断不可读取':diagnostic.issueCount>0?`保留的检查记录有 ${diagnostic.issueCount} 项兼容性问题`:'保留的依赖记录未发现问题',h('p',null,'这是已有任务的记录，本次备份仍须通过完整检查。'),navigate('help','查看实际记录')):null;
+      const compatibility=diagnostic?h('div',{className:'ep-notice',role:'note'},diagnostic.unavailable?'保留的依赖诊断不可读取':diagnostic.issueCount>0?`保留的检查记录有 ${diagnostic.issueCount} 项兼容性问题（已写入归档）`:'保留的依赖记录未发现问题',h('p',null,'recovery/4 会把实际冲突保留在归档元数据中；恢复计划会重新检查依赖、宿主与数据 schema，未解决的关键问题会阻断提交。'),navigate('help','查看实际记录')):null;
       const backup=h('div',null,
         h('div',{className:'ep-profile'},h('div',{className:'ep-profile-name'},h('span',{className:'ep-profile-icon'},icon('folder')),h('div',null,h('strong',null,defaults?.profileDirectory?.split(/[\\/]/).filter(Boolean).pop()||'当前 Profile 未确认'),h('p',{className:'ep-small'},'当前 Profile'))),h('span',{className:'ep-pill'},'本次尚未检查')),
         h('div',{className:'ep-hero'},h('div',{className:'ep-hero-top'},h('div',null,h('h3',null,'完整环境备份'),h('p',{className:'ep-sub'},'将插件、配置和私人数据保存为一个恢复包，用于重装、迁移或归档。')),h('div',{className:'ep-archive'},icon('archive'))),h('div',{className:'ep-create'},action('create',busy?'正在准备…':'创建完整环境备份（离线）',()=>go(false),busy,true),h('span',{className:'ep-small'},'选择新的 ZIP 保存位置')),h('div',{className:'ep-flow'},'选择位置',icon('chevron'),'助手接管',icon('chevron'),'正常退出后备份')),
@@ -103,7 +114,7 @@ window.__ModuleLoader__.load({
         h('p',{className:'ep-bottom'},'界面继承 DSH 的主题与字号；独立助手外观在助手内调整。'));
       const tabNames=[['backup','备份'],['tasks','任务与恢复'],['help','帮助与诊断']];
       const onTabKey=(event,index)=>{let next;if(event.key==='ArrowRight')next=(index+1)%3;else if(event.key==='ArrowLeft')next=(index+2)%3;else if(event.key==='Home')next=0;else if(event.key==='End')next=2;else return;event.preventDefault();setTab(tabNames[next][0]);event.currentTarget.parentElement.children[next].focus();};
-      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},defaults?.version||'0.6.0')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
+      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},defaults?.version||'0.6.1')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
         h('div',{className:'ep-tabs',role:'tablist','aria-label':'环境恢复包功能'},tabNames.map(([name,label],i)=>h('button',{key:name,id:'ep-tab-'+name,type:'button',role:'tab','aria-selected':tab===name,'aria-controls':'ep-panel-'+name,tabIndex:tab===name?0:-1,onClick:()=>setTab(name),onKeyDown:event=>onTabKey(event,i)},label))),
         h('div',{className:'ep-status','data-tone':tone,role:'status','aria-live':'polite','aria-atomic':true,hidden:!message},h('strong',null,stateLabel),message),
         h('div',{role:'tabpanel',id:'ep-panel-'+tab,'aria-labelledby':'ep-tab-'+tab,tabIndex:0},tab==='backup'?backup:tab==='tasks'?tasks:help));

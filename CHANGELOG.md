@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.1 — 2026-11-05
+
+- recovery/4 cold backup no longer refuses a fully readable source tree solely because installed peers/engines conflict. The real issues are recorded in `manifest.compatibility` and the dependency report; malformed package metadata and unreadable sources still stop the archive. Restore re-evaluates the same contract, so unresolved critical issues still block apply/commit. recovery/2 and recovery/3 backup/restore gates are unchanged.
+- The standalone WinForms assistant uses coordinated Fluent light/dark palettes. The light primary action is a readable blue instead of a dark block; secondary buttons keep a visible surface/border; hover, pressed, disabled and focus states are unified. Dark-theme header actions, copy buttons, log text and disabled controls now set explicit readable foregrounds; text boxes show a blue focus border. The DWM caption/border colors are matched to the content background where Windows supports them.
+- The assistant layout is compact and sectioned: five-step header, status card, save-location card, terminal result card, grouped details/appearance actions, and a copy action for long paths. Card spacing, internal vertical padding, text-block rhythm and footer breathing were tuned without restoring large blank areas; the window height still auto-fits the current content (waiting/failure stay compact; success grows only when the result card is present).
+- Terminal pages stay open until the user closes them. Success requires the target ZIP to exist with the verified size and shows path, size, SHA-256, integrity result and completion time. A restrained amber strip separates ZIP integrity from recovery compatibility when dependency conflicts were recorded; it does not change the success result or restore gate. Failure, cancellation and interruption are distinct, persisted in `ui-result.json`, and readable from Packer's task history (including terminal-only records).
+- Add focused tests for the recovery/4 dependency gate, light/dark contrast, compact layout, and success/failure/cancel/unknown result persistence.
+
 ## 0.6.0 — 2026-11-05
 
 - Add the independent format-4 environment migration channel, manifest coverage, external memory/Skills and original package provenance capture, and typed rc.5 path/data adapters. Keep strict recovery/2 and recovery/3 compatibility rules unchanged.

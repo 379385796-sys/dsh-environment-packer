@@ -27,7 +27,7 @@ export function apply(ctx,config={}){
  }});};ctx.effect(()=>{route();const off=ctx.on('internal/service',route);return()=>{off?.();dispose?.();};});
 }
 `);
-  write(path.join(profile,'package.json'),JSON.stringify({name:'synthetic-rc5-profile',private:true,dependencies:{'dsh-environment-packer':'0.6.0','packer-synthetic-state':'1.0.0'},dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app','dsh-environment-packer','packer-synthetic-state']}}}));
+  write(path.join(profile,'package.json'),JSON.stringify({name:'synthetic-rc5-profile',private:true,dependencies:{'dsh-environment-packer':'0.6.1','packer-synthetic-state':'1.0.0'},dsh:{profile:{bundles:['@deepseek-ai/dsh-base','@deepseek-ai/dsh-web-app','dsh-environment-packer','packer-synthetic-state']}}}));
   write(path.join(profile,'cordis.yml'),'[]\n');
   write(path.join(profile,'cordis.patch.yml'),'- id: workspace-controller\n  config:\n    documentsDirectory: '+JSON.stringify(workspace)+'\n- id: synthetic-memory\n  config:\n    dataDir: '+JSON.stringify(memory)+'\n    label: SYNTHETIC_RC5_CONFIG\n    note: '+JSON.stringify('literal '+workspace)+'\n- id: ui-settings-general\n  config:\n    welcomeNoticeVersion: 2026-09-28.1\n');
   const child=path.join(workspace,'子目录');fs.mkdirSync(child,{recursive:true});

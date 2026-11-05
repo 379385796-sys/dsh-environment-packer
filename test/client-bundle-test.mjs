@@ -2,13 +2,18 @@ import assert from 'node:assert/strict';
 
 // Minimal stand-ins so the browser bundle can be executed in Node: this catches
 // syntax slips and hook misuse in the settings section without a full UI.
-const hooks = { state: [], index: 0, effects: [] };
+const hooks = { state: [], refs: [], index: 0, effects: [] };
 const React = {
   createElement: (type, props, ...children) => ({ type, props, children }),
   useState: (initial) => {
     const slot = hooks.index++;
     if (!(slot in hooks.state)) hooks.state[slot] = typeof initial === 'function' ? initial() : initial;
     return [hooks.state[slot], (value) => { hooks.state[slot] = value; }];
+  },
+  useRef: (initial) => {
+    const slot = hooks.index++;
+    if (!(slot in hooks.refs)) hooks.refs[slot] = { current: initial };
+    return hooks.refs[slot];
   },
   useEffect: (fn) => { if (!hooks.effects.length) hooks.effects.push(fn); },
 };
@@ -56,7 +61,7 @@ globalThis.fetch=async(url,init={})=>{requests.push({url,...init});assert(respon
 try {
  assert.equal(requests.length,0,'render must not start backup');
  responses.push(reply({ok:false,cancelled:true}));await action('create').props.onClick();assert.match(status(),/已取消/);assert.match(requests.at(-1).url,/cold-backup$/);assert(!action('create').props.disabled,'cancelled preparation must re-enable creation');
- let finish;responses.push(new Promise(resolve=>finish=resolve));const pending=action('create').props.onClick();assert(action('create').props.disabled);assert.match(status(),/确认本次私人冷备份/);assert.deepEqual(JSON.parse(requests.at(-1).body),{});
+ let finish;responses.push(new Promise(resolve=>finish=resolve));const pending=action('create').props.onClick();assert(action('create').props.disabled);assert.match(status(),/确认本次私人冷备份/);assert.deepEqual(JSON.parse(requests.at(-1).body),{clientPreferences:{'dsh-chat-comfort.settings.v1':{enabled:true,density:'comfortable'}}});
  finish(reply({ok:true,taskId:'synthetic-task'},202));await pending;assert.match(status(),/独立助手已接管任务 synthetic-task/);assert(!action('create').props.disabled);
  tab('任务与恢复').props.onClick();responses.push(reply({ok:false,error:'COLD_TASK_RUNNING_OR_UNPROVEN'},409));await action('recover').props.onClick();assert.match(status(),/无法证明/);assert.match(requests.at(-1).url,/recover-cold-task$/);
  responses.push(reply({ok:true,code:'COLD_RECOVERED'}));await action('recover').props.onClick();assert.match(status(),/已安全恢复/);

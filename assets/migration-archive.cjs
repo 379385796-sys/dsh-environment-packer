@@ -2,6 +2,13 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),os=require('node:os');
 const {pathToFileURL}=require('node:url'),C=require('./recovery-core.cjs'),A=require('./migration-data.cjs');
 const FORMAT='dsh-private-recovery/4';
+// recovery/4 archives a readable source tree even when installed packages do not
+// satisfy declared peers/engines. The real conflicts are recorded in the manifest
+// and the restore plan re-evaluates the same contract, so unresolved critical
+// issues still block apply/commit. Malformed package metadata is not a version
+// conflict and must still stop the archive before any bytes are written.
+const RECORDABLE_DEPENDENCY_CODES=new Set(['DSH_ENGINE_MISMATCH','PEER_VERSION_MISMATCH','HOST_PEER_VERSION_MISMATCH','TRANSITIVE_DEPENDENCY_MISSING','HOST_BROWSER_PEER_UNPROVEN']);
+const MAX_RECORDED_DEPENDENCY_ISSUES=200;
 const OMIT_HOME=new Set(['profiles','cache','logs','telemetry','dsh-runtimes','.packer-cold','subagent-gc-backup','.anonymous-user-id','dsh-skills-manager.log','PACKER-CLIENT-PREFERENCES.json','PACKER-RESTORE-RESULT.json','PACKER-TOOL-PROVENANCE.json']);
 const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','AGENTS.md','.credentials.yaml','.credentials.yml','settings.yaml','settings.yaml.imported','cordis.patch.yml','.env','dsh-claude-style','rewind-snapshots','skills-manager','llm-deepseek','archive-manager','aik_auto_memory_use','dsh-market','dsh-builtin-browser-host','models','emoji-packs','whale-audio','whale-bubble-imgs','whale-roles','.dshw-size.json','.dshw-turn.json','.dshw-usage.json']);
 async function legacy(){return import(pathToFileURL(path.join(__dirname,'../lib/private-backup.js')).href);}
@@ -97,6 +104,11 @@ function validate(zip){
   let m;try{m=JSON.parse(zip.get('manifest.json'));}catch{C.fail('INVALID_MANIFEST');}
   if(m.format!==FORMAT||m.schemaVersion!==1||m.mode!=='environment-migration'||!Array.isArray(m.files)||!Array.isArray(m.directories)||!Array.isArray(m.roots)||!Array.isArray(m.packages)||!m.sourceRuntime||!m.coverage)C.fail('INVALID_MIGRATION_MANIFEST');
   if(!m.files.length||m.files.length+m.directories.length>=C.MAX_ENTRIES||!m.files.some(f=>f.path==='profiles/desktop/package.json'))C.fail('INVALID_MIGRATION_MANIFEST');
+  if(m.compatibility!==undefined){
+    const c=m.compatibility;
+    if(!c||typeof c!=='object'||Array.isArray(c)||!Number.isSafeInteger(c.dependencyIssueCount)||c.dependencyIssueCount<0||!Array.isArray(c.dependencyIssues)||c.dependencyIssues.length>c.dependencyIssueCount||!Array.isArray(c.optionalMissing))C.fail('INVALID_MIGRATION_MANIFEST');
+    for(const i of c.dependencyIssues)if(!i||typeof i.code!=='string'||!/^[A-Z0-9_]{1,100}$/.test(i.code)||(i.actual!==null&&typeof i.actual!=='string')||(i.range!==null&&typeof i.range!=='string'))C.fail('INVALID_MIGRATION_MANIFEST');
+  }
   const all=new Map(),ids=new Set();for(const r of m.roots){if(typeof r.id!=='string'||!/^[a-z0-9-]+$/.test(r.id)||ids.has(r.id)||!['home','profile','workspace','memory','skills','agents'].includes(r.kind)||typeof r.path!=='string'||!path.win32.isAbsolute(r.path))C.fail('INVALID_MIGRATION_ROOT');ids.add(r.id);}
   for(const [list,type]of [[m.directories,'dir'],[m.files,'file']])for(const f of list){const n=type==='file'?f.path:f;C.safeName(n);if(!/^(profiles\/desktop\/|home-data\/|packages\/|preferences\/|workspaces\/)/.test(n)||all.has(n.toLowerCase()))C.fail('INVALID_MIGRATION_SCOPE');all.set(n.toLowerCase(),type);if(type==='file'&&(!/^[a-f0-9]{64}$/.test(f.sha256)||!Number.isSafeInteger(f.bytes)||f.bytes<0))C.fail('INVALID_MANIFEST');}
   for(const [n]of all){if(n.startsWith('workspaces/')&&!ids.has(n.split('/')[1]))C.fail('INVALID_MIGRATION_ROOT');const parts=n.split('/');parts.pop();while(parts.length){if(all.get(parts.join('/'))==='file')C.fail('ARCHIVE_PATH_COLLISION');parts.pop();}}
@@ -112,7 +124,9 @@ async function createBackup(options){
   for(const r of before.roots)if(A.inside(r.path,target)&&r.kind!=='workspace')C.fail('TARGET_INSIDE_SOURCE');
   options.onInventory?.([...new Set(before.files.map(f=>f.source))]);
   const base=await legacy(),dependencyCheck=base.checkPayload(before.legacyInventory.files,{dshVersion:options.dshVersion,probeTask:options.id?{id:options.id,homeDir:options.homeDir}:undefined});
-  options.onDependencyCheck?.(dependencyCheck);if(dependencyCheck.issues.length)C.fail(dependencyCheck.issues[0].code);
+  options.onDependencyCheck?.(dependencyCheck);
+  const structural=dependencyCheck.issues.find(issue=>!RECORDABLE_DEPENDENCY_CODES.has(issue.code));
+  if(structural)C.fail(structural.code);
   const temp=path.join(parent,'.'+path.basename(target)+'.migration-'+crypto.randomBytes(8).toString('hex')+'.tmp');let writer,committed=false,tempId;
   try{
     writer=new C.ZipWriter(temp);const records=[];let bytes=0;options.onPhase?.('writing');
@@ -124,11 +138,14 @@ async function createBackup(options){
       const bytes=C.readStable(f.source),sqlite=bytes.length>=100&&A.sqliteHeader(bytes);
       dataSets.push({path:f.path,owner:sqlite&&f.path.endsWith('/mnemon.db')&&before.tools.length?'mnemon':'unknown',headerVersion:sqlite?bytes.readUInt32BE(60):null});
     }}
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},roots:before.roots,packages:before.packages,tools:before.tools,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,completeWithinDeclaredScope:true,engineeringSourceExcluded:true,installerExcluded:true}};
+    const dependencyIssues=dependencyCheck.issues.map(i=>({code:i.code,package:i.package??null,name:i.name??null,range:i.range??null,actual:i.actual??null,kind:i.kind??null,realm:i.realm??null,state:'recorded'}));
+    const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
+    const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,completeWithinDeclaredScope:true,engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;
-    const result={path:target,sha256,bytes:fs.statSync(target).size,files:records.length,manifest:m,cleanup:{tempRemoved:false}};options.onCommitted?.({path:target,sha256,bytes:result.bytes,files:records.length,verified:true});fs.unlinkSync(temp);result.cleanup.tempRemoved=true;return result;
+    const result={path:target,sha256,bytes:fs.statSync(target).size,files:records.length,manifest:m,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,cleanup:{tempRemoved:false}};options.onCommitted?.({path:target,sha256,bytes:result.bytes,files:records.length,verified:true});fs.unlinkSync(temp);result.cleanup.tempRemoved=true;return result;
   }catch(e){writer?.close();if(!options.preserveFailureArtifacts){if(committed&&C.identity(fs.lstatSync(target))===tempId)fs.unlinkSync(target);if(fs.existsSync(temp))fs.unlinkSync(temp);}throw e;}
 }
 function readArchive(file){const zip=C.openZip(file);try{const head=JSON.parse(zip.get('manifest.json'));if(head.format===FORMAT)return {zip,manifest:validate(zip),legacy:false};const m=require('./verify-private.cjs').validateArchive(zip);return {zip,manifest:{format:m.format,schemaVersion:0,mode:'environment-migration',producerVersion:m.packerVersion,sourceRuntime:{...m.compatibility,nodeModules:m.compatibility.nodeModules,nodeMajor:m.compatibility.nodeMajor},roots:[{id:'home',kind:'home',path:'Z:\\legacy-unknown-home'},{id:'profile',kind:'profile',path:'Z:\\legacy-unknown-home\\profiles\\desktop'}],files:m.files.map(f=>({...f,path:f.path.startsWith('profile/')?'profiles/desktop/'+f.path.slice(8):'home-data/'+f.path.slice(5),archivePath:f.path})),directories:m.directories.map(n=>n.startsWith('profile/')?'profiles/desktop/'+n.slice(8):'home-data/'+n.slice(5)),packages:[],coverage:{missing:[{code:'LEGACY_COVERAGE_INCOMPLETE',critical:true}],excluded:m.exclusions||[]}},legacy:true};}catch(e){zip.close();throw e;}}

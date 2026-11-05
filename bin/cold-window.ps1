@@ -7,8 +7,6 @@ $script:leaseProcessed = $false
 $script:taskGuard = $null
 $script:userCancelled = $false
 $script:terminalSeen = $false
-$script:autoCloseClock = $null
-$script:autoCloseDelay = 0
 function Write-NewTaskRecord([string]$Name,[string]$Json) {
   $destination = Join-Path $TaskDirectory $Name
   $temporary = $destination + '.new'
@@ -19,23 +17,37 @@ function Complete-AssistantView([string]$Outcome,[int]$Delay,[string]$Code) {
   # A terminal-looking status is not enough: the owning coordinator must have
   # completed its finally block, including worker shutdown and lock retirement.
   if ($null -eq $script:worker -or -not $script:worker.HasExited) { return }
+  # D8: never claim success unless the ZIP really exists at the target and its
+  # size matches the verified terminal record. The coordinator already checked
+  # structure, CRC, manifest and every payload hash before publishing.
+  if ($Outcome -eq 'success') {
+    $sizeOk=$false
+    try { $item=Get-Item -LiteralPath $job.target -ErrorAction Stop; $sizeOk=(-not $item.PSIsContainer) -and ($null -eq $script:lastStatus.bytes -or [long]$item.Length -eq [long]$script:lastStatus.bytes) } catch {}
+    if (-not $sizeOk -or $script:lastStatus.phase -ne 'success') { $Outcome='unknown'; $Code='ASSISTANT_ZIP_MISSING' }
+  }
   foreach ($stream in $script:leases) { $stream.Dispose() }; $script:leases.Clear()
-  $record=@{id=$job.id;outcome=$Outcome;code=$Code;result=if($Outcome -eq 'success'){'files-verified'}else{'unconfirmed'};workerExited=$true;workerExitCode=$script:worker.ExitCode;sourceLeasesReleased=$true;at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+  $state=$script:lastStatus
+  $zipPresent=$false; try { $zipPresent=Test-Path -LiteralPath $job.target } catch {}
+  $completedAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $record=@{id=$job.id;outcome=$Outcome;code=$Code;result=if($Outcome -eq 'success'){'files-verified'}else{'unconfirmed'};phase=if($state){[string]$state.phase}else{'unknown'};target=$job.target;bytes=if($state -and $null -ne $state.bytes){[long]$state.bytes}else{$null};sha256=if($state -and $state.sha256){[string]$state.sha256}else{$null};files=if($state -and $null -ne $state.files){[long]$state.files}else{$null};verified=($state -and $state.verified -eq $true);cleanup=($state -and $state.cleanup -eq $true);dependencyIssues=if($state -and $null -ne $state.dependencyIssues){[int]$state.dependencyIssues}else{0};integrity=if($Outcome -eq 'success'){'zip-crc-manifest-payload-verified'}else{'unconfirmed'};zipPresent=$zipPresent;completedAt=$completedAt;workerExited=$true;workerExitCode=$script:worker.ExitCode;sourceLeasesReleased=$true;at=$completedAt}
   $durable=$false
   try { Write-NewTaskRecord 'ui-result.json' ($record|ConvertTo-Json -Compress);$durable=$true } catch {}
-  $script:finished=$true;$confirmExit.Enabled=$false;$cancel.Enabled=$true;$cancel.Text='关闭'
+  $script:finished=$true;$confirmExit.Enabled=$false;$cancel.Enabled=$true;$cancel.Text='关闭窗口'
   $progress.MarqueeAnimationSpeed=0;$progress.Style='Continuous'
   if($Outcome -eq 'unknown'){
-    Update-PackerAssistantState $view @{phase='unknown';files=$view.LastFiles;error=$Code}
-    $view.title.Text='任务结果未确认';$view.subtitle.Text='协调器已退出，但没有可靠的完整终态。'
+    Update-PackerAssistantState $view @{phase='unknown';files=$state.files;error=$Code;target=$job.target;at=$completedAt;zipPresent=$zipPresent}
+    $view.title.Text='结果未确认';$view.subtitle.Text='协调器已退出，但没有可靠的完整终态。'
     $view.instructions.Visible=$true;$view.instructions.Text='诊断已保留；未报告成功的 ZIP 不能当作成功备份，任务锁继续按原规则保护。'
   }elseif($Outcome -eq 'cancelled'){
-    $view.title.Text='任务已安全取消';$view.subtitle.Text='写入与收尾已经结束，取消记录已保留。'
+    Update-PackerAssistantState $view @{phase='cancelled';files=$state.files;error=$Code;target=$job.target;at=$completedAt;zipPresent=$zipPresent}
+    $view.title.Text='任务已取消';$view.subtitle.Text='写入与收尾已经结束；未生成有效 ZIP。'
   }
   if($Outcome -eq 'unknown' -and -not $durable){$view.hint.Text='诊断写入失败，请保留此窗口并检查原始任务记录。';return}
-  $view.hint.Text=if($Outcome -eq 'success'){'约 3 秒后自动关闭；可现在关闭。不会自动启动 DSH。'}elseif($Outcome -eq 'cancelled'){'安全收尾完成，助手将自动关闭。'}else{'约 10 秒后自动关闭；诊断可在下次启动 DSH 后查看。'}
+  $view.hint.Text=if($Outcome -eq 'success'){'结果已保留，请确认后关闭。不会自动重启 DSH。'}elseif($Outcome -eq 'cancelled'){'结果已保留；如仍需备份，请重新发起。'}else{'结果已保留，请确认后关闭；诊断可在下次启动 DSH 后查看。'}
   & $view.Layout
-  $script:autoCloseDelay=$Delay;$script:autoCloseClock=[Diagnostics.Stopwatch]::StartNew()
+  # The final page stays until the user closes it. No auto-close timer is armed.
+  try { $timer.Stop() } catch {}
+  try { $form.Activate();$form.BringToFront() } catch {}
 }
 try {
   Add-Type -AssemblyName System.Windows.Forms
@@ -83,7 +95,7 @@ try {
   $script:started = [DateTime]::UtcNow
   $timer.Add_Tick({
     try {
-      if($script:finished){if($null -ne $script:autoCloseClock -and $script:autoCloseClock.ElapsedMilliseconds -ge $script:autoCloseDelay){$timer.Stop();$form.Close()};return}
+      if($script:finished){return}
       if (([DateTime]::UtcNow - $script:started).TotalSeconds -gt 3) { $form.TopMost = $false }
       $leaseRequest = Join-Path $TaskDirectory 'lease-request.private.json'
       if (-not $script:leaseProcessed -and (Test-Path -LiteralPath $leaseRequest)) {
@@ -125,7 +137,16 @@ try {
         }
         if ($s.id -ne $job.id) { throw 'INVALID_COLD_TASK' }
         $script:lastStatus = $s
-        Update-PackerAssistantState $view $s
+        if($s.phase -eq 'failed'){try{$s|Add-Member -NotePropertyName zipPresent -NotePropertyValue (Test-Path -LiteralPath $job.target) -Force}catch{}}
+        # A terminal-looking success is not displayed as success while the
+        # coordinator is still alive or the target ZIP is absent/mismatched.
+        $effective=$s
+        if($s.phase -eq 'success'){
+          $zipOk=$false
+          try { $item=Get-Item -LiteralPath $job.target -ErrorAction Stop; $zipOk=(-not $item.PSIsContainer) -and ($null -eq $s.bytes -or [long]$item.Length -eq [long]$s.bytes) } catch {}
+          if(-not $script:worker.HasExited -or -not $zipOk){$effective=@{phase='unknown';files=$s.files;error='ASSISTANT_TERMINAL_UNCONFIRMED';target=$job.target;at=$s.at;zipPresent=$zipOk}}
+        }
+        Update-PackerAssistantState $view $effective
         if (-not $script:ready -and (Test-Path -LiteralPath (Join-Path $TaskDirectory 'worker-ready.json'))) {
           $r = Get-Content -LiteralPath (Join-Path $TaskDirectory 'worker-ready.json') -Raw -Encoding UTF8 | ConvertFrom-Json
           if($script:worker.HasExited){Complete-AssistantView 'unknown' 10000 'ASSISTANT_START_FAILED';return}
@@ -157,14 +178,20 @@ try {
           # Keep inventory/lease evidence for diagnosis. Never remove failed artifacts.
           if ($s.phase -eq 'success') {
             $progress.Value = 100
-            $label.Text += "`r`n路径：$($job.target)`r`n大小：$($s.bytes) bytes`r`nSHA-256：$($s.sha256)`r`n载荷、CRC、清单、条目集合已验证；临时文件已清理。`r`n私人 ZIP 未加密，请妥善保管。不会自动重启 DSH。"
+            $doneAt=$null;try{$doneAt=[DateTimeOffset]::FromUnixTimeMilliseconds([long]$s.at).ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')}catch{}
+            $conflicts=if($null -ne $s.dependencyIssues){[int]$s.dependencyIssues}else{0}
+            $label.Text += "`r`n路径：$($job.target)`r`n大小：$($s.bytes) bytes`r`nSHA-256：$($s.sha256)`r`n完整性：ZIP 结构、CRC、清单与全部载荷哈希通过；临时文件已清理。`r`n完成时间：$doneAt`r`n依赖冲突：$(if($conflicts -gt 0){"$conflicts 项已记录；恢复时将重新检查，未解决的关键问题会阻断提交。"}else{'未发现冲突。'})`r`n私人 ZIP 未加密，请妥善保管。结果会保留到你主动关闭；不会自动重启 DSH。"
             $open.Enabled = $true
           } else {
-            $label.Text += "`r`n错误码：$($s.error)`r`n故障记录和残留文件已保留。关闭此窗口后，可在 Packer 页面点击【检查并恢复异常任务】。未报告成功的 ZIP 须独立验证，请使用新名称重试。"
-            if ($s.error -eq 'TRANSITIVE_DEPENDENCY_MISSING') {
-              $label.Text += "`r`n依赖完整性检查未通过。当前检查要求依赖存在于备份载荷；某些由 DSH 宿主提供的 peer 也可能触发此限制。请保留诊断记录，先修复或核验依赖来源与恢复兼容性；不要删除依赖声明或关闭检测。"
+            $zipPresent=$false;try{$zipPresent=Test-Path -LiteralPath $job.target}catch{}
+            $doneAt=$null;try{$doneAt=[DateTimeOffset]::FromUnixTimeMilliseconds([long]$s.at).ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss')}catch{}
+            $label.Text += "`r`n错误码：$($s.error)`r`n有效 ZIP：$(if($zipPresent){'存在未确认文件，不能视为成功备份。'}else{'未生成。'})`r`n需要重新备份：是。请使用新的 ZIP 名称重试。`r`n完成时间：$doneAt`r`n故障记录和残留文件已保留。关闭此窗口后，可在 Packer 页面点击【检查并恢复异常任务】。"
+            if ($s.error -in @('TRANSITIVE_DEPENDENCY_MISSING','PEER_VERSION_MISMATCH','HOST_PEER_VERSION_MISMATCH','HOST_BROWSER_PEER_UNPROVEN','DSH_ENGINE_MISMATCH')) {
+              $label.Text += "`r`n依赖检查记录了冲突，但该冲突不是本次备份中止的原因；请查看保留的依赖诊断，恢复时会重新检查并阻断未解决的关键问题。"
             } elseif ($s.error -eq 'DECLARED_DEPENDENCY_MISSING') {
               $label.Text += "`r`nProfile 声明的插件/依赖没有完整安装，请通过正常插件管理流程修复安装后，再使用新 ZIP 名称重试。"
+            } elseif ($s.error -eq 'INSTALLED_PACKAGE_INVALID') {
+              $label.Text += "`r`n已安装包的元数据无法解析；这不是版本冲突，请先修复插件安装。"
             }
           }
           if($script:worker.HasExited){

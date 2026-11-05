@@ -31,3 +31,16 @@ The v0.5.0 Release retains the exact accepted and installed tgz (SHA-256 `b301ef
 ## v0.6.0 release artifact
 
 The runtime code is pinned to ae441043444491c2bfb1e0b67cafc5da453bb1fc. The user approved a documentation-only repackage for the final 0.6.0 README/links. All 132 non-document package files remain byte-identical to the accepted candidate; no functional executable was recompiled. Exact published attachment hashes are recorded in RELEASE-0.6.0.md and GitHub Release. Source documentation can evolve after artifact acceptance; do not silently replace an already released same-version archive.
+
+## v0.6.1 release
+
+Release-prep UI pass adds: explicit dark-theme foregrounds for header actions, copy buttons, log text and disabled controls; blue focus borders for path fields; content-fitted window height; a separate amber recovery-compatibility strip on success; and DWM caption/border color matching where Windows supports it. `result-state-test.ps1` covers 12 checks including light/dark contrast for these controls. Real 150% DPI remains unverified; the test uses 15.75pt/560px simulation and records `real150DPITested=false`.
+
+Baseline is the published v0.6.0 tree. The four targeted fixes are covered by:
+
+- `test/migration-dependency-gate.cjs` — synthetic rewind/schemastery peer conflict; recovery/4 archive succeeds and records the conflict; restore compatibility is still blocked; recovery/2+3 still refuse before writing; malformed metadata still fails.
+- `test/cold-view-test.ps1`, `test/appearance-controls-test.ps1`, `test/final-layout-test.ps1`, `test/cold-paint-log-test.ps1` — theme, compact layout, copy/result controls, DPI/font extremes, keyboard/tab and accessibility contracts.
+- `test/ui-overview-test.mjs` — persisted success/failure/cancel/unknown result records, terminal-only success, and no upgrade to success without a verified terminal record.
+- `test/migration-smoke.cjs` and the existing recovery/2+3 focused entries — old strict-restore behavior remains unchanged.
+
+Build the release with `npm pack --ignore-scripts --json` into a separate candidate directory, then assemble the standalone toolkit from the package plus `Open-Recovery.ps1`, `READ-FIRST.txt` and `TOOLKIT-FILES.sha256`. Record exact SHA-256 values in the release assets. The accepted artifact was installed into the formal profile and a formal recovery/4 backup was generated with the known rewind/schemastery conflict recorded; no restore was executed.

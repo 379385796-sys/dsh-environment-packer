@@ -21,6 +21,21 @@ const receipt=path.join(root,id,'ui-result.json');
 fs.writeFileSync(status,JSON.stringify({id,phase:'waiting',files:12}));
 fs.writeFileSync(receipt,'\uFEFF'+JSON.stringify({id,outcome:'unknown',code:'ASSISTANT_COORDINATOR_EXITED',workerExited:true,privateValue:'DO_NOT_EXPOSE'}));
 const receiptBefore=fingerprint(),unknown=readUiOverview(home);assert.equal(unknown.current.phase,'unknown');assert.equal(unknown.current.error,'ASSISTANT_COORDINATOR_EXITED');assert(!JSON.stringify(unknown).includes('DO_NOT_EXPOSE'));assert.deepEqual(fingerprint(),receiptBefore);assert.equal(fs.readFileSync(lock,'utf8'),id);
+// A verified terminal success exposes bounded result details for the Packer page.
+const otherDir=path.join(root,other),jobFile=path.join(otherDir,'job.json'),terminalFile=path.join(otherDir,'terminal.json'),otherReceipt=path.join(otherDir,'ui-result.json');
+fs.writeFileSync(jobFile,JSON.stringify({id:other,target:'D:\\Backup\\private.zip',homeDir:'C:\\PRIVATE_HOME'}));
+fs.writeFileSync(terminalFile,JSON.stringify({id:other,phase:'success',files:69,bytes:4096,sha256:'b'.repeat(64),verified:true,cleanup:true,dependencyIssues:2,at:1793853731000}));
+fs.writeFileSync(otherReceipt,JSON.stringify({id:other,outcome:'success',workerExited:true,target:'D:\\Backup\\private.zip',bytes:4096,sha256:'b'.repeat(64),files:69,verified:true,integrity:'zip-crc-manifest-payload-verified',completedAt:1793853731000,dependencyIssues:2,privateValue:'DO_NOT_EXPOSE'}));
+const success=readUiOverview(home).history.find(t=>t.id===other);
+assert.equal(success.result.outcome,'success');assert.equal(success.result.target,'D:\\Backup\\private.zip');assert.equal(success.result.sha256,'b'.repeat(64));assert.equal(success.result.bytes,4096);assert.equal(success.result.files,69);assert.equal(success.result.dependencyIssues,2);assert.equal(success.result.integrity,'verified');assert.equal(success.result.completedAt,1793853731000);assert(!JSON.stringify(success).includes('DO_NOT_EXPOSE'));assert(!JSON.stringify(success).includes('PRIVATE_HOME'));
+// A UI receipt can never upgrade an unverified terminal record to success.
+fs.writeFileSync(terminalFile,JSON.stringify({id:other,phase:'success',files:69,verified:false,cleanup:true,at:1793853731000}));assert.equal(readUiOverview(home).history.find(t=>t.id===other).result.outcome,'unknown');
+// A cancelled receipt keeps a failed/aborted terminal visibly cancelled, never successful.
+fs.writeFileSync(terminalFile,JSON.stringify({id:other,phase:'failed',files:0,error:'BACKUP_ABORTED',at:1793853731000}));fs.writeFileSync(otherReceipt,JSON.stringify({id:other,outcome:'cancelled',workerExited:true,code:'BACKUP_ABORTED',completedAt:1793853731000}));assert.equal(readUiOverview(home).history.find(t=>t.id===other).result.outcome,'cancelled');
+// Without a UI receipt, a verified terminal success still carries the result.
+fs.unlinkSync(otherReceipt);fs.writeFileSync(terminalFile,JSON.stringify({id:other,phase:'success',files:69,bytes:4096,sha256:'b'.repeat(64),verified:true,cleanup:true,at:1793853731000}));const terminalOnly=readUiOverview(home).history.find(t=>t.id===other);assert.equal(terminalOnly.result.outcome,'success');assert.equal(terminalOnly.result.target,'D:\\Backup\\private.zip');assert.equal(terminalOnly.assistant,undefined);
+// A 0.6.0 receipt without the new verification fields still trusts a verified terminal.
+fs.writeFileSync(otherReceipt,JSON.stringify({id:other,outcome:'success',workerExited:true,result:'files-verified'}));assert.equal(readUiOverview(home).history.find(t=>t.id===other).result.outcome,'success');
 fs.writeFileSync(status,JSON.stringify({id,phase:'success',files:69}));assert.equal(readUiOverview(home).current.phase,'success');
 fs.writeFileSync(receipt,JSON.stringify({id:other,outcome:'unknown',workerExited:true}));assert.equal(readUiOverview(home).current.assistant,undefined);
 const linkHome=fs.mkdtempSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'ui-overview-link-'));fs.symlinkSync(root,path.join(linkHome,'.packer-cold'),'junction');assert.equal(readUiOverview(linkHome).state,'unavailable');

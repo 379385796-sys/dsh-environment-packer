@@ -1,8 +1,15 @@
-# DSH Environment Packer · v0.6.0
+# DSH Environment Packer · v0.6.1
 
 **环境恢复包：为 DSH 创建私人冷备份，并在新路径、新兼容宿主上恢复环境。**
 
-[下载 v0.6.0](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.0) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md)
+[下载 v0.6.1](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.1) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md)
+
+## 0.6.1 定向修复
+
+- recovery/4 冷备允许在依赖版本/peer 冲突存在时归档可完整读取的源文件；真实冲突写入归档元数据与备份报告，恢复计划仍会重新检查并阻断未解决的关键问题。recovery/2、recovery/3 的严格语义不变。
+- 独立助手改用协调的 Fluent 浅色/深色配色；浅色主按钮不再使用深色大块。按钮、边框、圆角、悬停、禁用和焦点状态统一，深色页眉操作/复制按钮/日志文本显式提升对比度，标题栏在支持时与内容背景协调。
+- 助手改为紧凑的向导布局：五步流程、运行状态、保存位置和结果分区；任务详情与外观收进顶部次级操作组；路径可复制；窗口高度按当前内容收紧，等待页不再保留大面积空白。
+- 备份结束不再自动关闭。成功页显示 ZIP 路径、大小、SHA-256、ZIP 完整性结果和完成时间；存在依赖冲突时用独立琥珀色提示条区分“ZIP 完整性通过”与“恢复兼容性待检查”，不改变成功判定或恢复门禁。失败、取消、中断分别显示，结果持久保留并可在 Packer 任务记录中查看。
 
 ## 能保存什么
 
@@ -15,13 +22,13 @@
 
 ## 下载与安装
 
-从 [v0.6.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.0) 下载：
+从 [v0.6.1 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.1) 下载：
 
 | 文件 | 用途 |
 |---|---|
-| `dsh-environment-packer-0.6.0.tgz` | DSH 插件安装包 |
-| `Packer-v0.6.0-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
-| 同名 `.sha256` | 下载校验值 |
+| `dsh-environment-packer-0.6.1.tgz` | DSH 插件安装包 |
+| `Packer-v0.6.1-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
+| `SHA256SUMS.txt` / 同名 `.sha256` | 下载校验值 |
 
 保存当前环境并正常退出 DSH，使用当前 Desktop 随附的官方插件管理流程安装本地 TGZ。已配置 CLI 时可用：
 
@@ -29,7 +36,7 @@
 dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 ```
 
-升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 0.6.0。独立恢复工具请保留完整目录，不能只复制 EXE。
+升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 0.6.1。独立恢复工具请保留完整目录，不能只复制 EXE。
 
 ## 备份与恢复
 
@@ -58,4 +65,4 @@ dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 - 旧 recovery/2、recovery/3 的 strict-restore 仍保持原精确运行时和证明限制。
 - 隔离目录与进程内限制不是恶意原生插件的操作系统沙箱，只使用可信归档。
 
-详见 [迁移通道](docs/MIGRATION.md)、[变更记录](CHANGELOG.md) 和 [v0.6.0 发布说明](docs/RELEASE-0.6.0.md)。
+详见 [迁移通道](docs/MIGRATION.md)、[变更记录](CHANGELOG.md) 和 [v0.6.1 发布说明](docs/RELEASE-0.6.1.md)。

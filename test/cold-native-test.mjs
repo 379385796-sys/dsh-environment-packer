@@ -17,10 +17,10 @@ async function until(fn,ms=120000){const end=Date.now()+ms;while(Date.now()<end)
 const results=[];
 async function closeUI(dir){
   const r=readRecord(path.join(dir,'ui-owner.json'));
-  // Lifecycle cleanup only for this synthetic test's exact UI identity. Actual
-  // user GUI close/normal-exit acceptance is recorded separately, never simulated here.
-  // Normal terminal windows must leave by themselves; never make this test
-  // pass by forcibly closing the helper whose lifetime is under test.
+  // 0.6.1 keeps a terminal result page open until the user closes it. Assert
+  // that it did not auto-exit, then close only this synthetic test's UI identity.
+  assert(taskOwners(dir).owners['ui-owner.json'],'terminal UI closed by itself');
+  try{process.kill(r.pid);}catch{}
   await until(()=>!taskOwners(dir).owners['ui-owner.json'],25000);
 }
 async function scenario(kind,reuse){
@@ -62,7 +62,7 @@ async function scenario(kind,reuse){
   }else{
     if(kind==='status-failure'){fs.renameSync(path.join(dir,'status.json'),path.join(dir,'status.saved.json'));fs.mkdirSync(path.join(dir,'status.json'));}
     if(kind==='cancel'||kind==='premature-terminal'){
-      if(kind==='premature-terminal'){fs.writeFileSync(path.join(dir,'terminal.json'),JSON.stringify({id:path.basename(dir),phase:'success',files:0,verified:true,cleanup:true}));await sleep(4300);assert(taskOwners(dir).owners['ui-owner.json']);assert(fs.existsSync(path.join(root,'active.lock')));}
+      if(kind==='premature-terminal'){fs.writeFileSync(path.join(dir,'terminal.json'),JSON.stringify({id:path.basename(dir),phase:'success',files:0,verified:true,cleanup:true}));await sleep(4300);assert(taskOwners(dir).owners['ui-owner.json']);assert(fs.existsSync(path.join(root,'active.lock')));assert(!fs.existsSync(path.join(dir,'ui-result.json')),'premature terminal produced a success receipt');}
       fs.writeFileSync(path.join(dir,'cancel'),'');
     }else if(kind==='interactive-cancel'){
       fs.writeFileSync(path.join(process.env.DSH_PACKER_EVIDENCE_DIR,'interactive-cancel-ready.json'),JSON.stringify({dir,homeDir,syntheticOnly:true}));console.log('READY interactive cancel '+dir);
@@ -75,19 +75,33 @@ async function scenario(kind,reuse){
     if(['cancel','interactive-cancel','premature-terminal'].includes(kind))assert.equal(terminal.error,'BACKUP_ABORTED');
     await until(()=>!fs.existsSync(path.join(root,'active.lock')));
     const receipt=await until(()=>{try{return readRecord(path.join(dir,'ui-result.json'));}catch{return false;}});
-    const terminalShown=Date.now();await closeUI(dir);const exitDelayMs=Date.now()-receipt.at;
-    assert(exitDelayMs>=(succeeds?2700:kind==='interactive-cancel'?400:9500),`early exit: ${exitDelayMs}`);
-    assert(exitDelayMs<(succeeds?6500:kind==='interactive-cancel'?4000:14000),`late exit: ${exitDelayMs}`);
+    // The terminal page must remain open until this test closes its own UI.
+    assert(taskOwners(dir).owners['ui-owner.json'],'terminal page did not remain open');
     assert.equal((await recoverColdTask(homeDir)).code,'COLD_NO_TASK');
     const observation=readRecord(path.join(dir,'ui-result.json'));assert.equal(observation.id,path.basename(dir));assert.equal(observation.workerExited,true);assert.equal(observation.sourceLeasesReleased,true);
     assert.equal(observation.outcome,succeeds?'success':kind==='interactive-cancel'?'cancelled':'failed');
     assert.equal(typeof observation.workerExitCode,'number');
-    if(succeeds)assert.equal(observation.workerExitCode,0);
+    if(succeeds){
+      assert.equal(observation.workerExitCode,0);
+      assert.equal(observation.phase,'success');
+      assert.equal(observation.verified,true);
+      assert.equal(observation.integrity,'zip-crc-manifest-payload-verified');
+      assert.equal(observation.target,target);
+      assert(fs.existsSync(target));
+      assert.equal(fs.statSync(target).size,observation.bytes);
+      assert.match(observation.sha256,/^[a-f0-9]{64}$/);
+      assert(Number.isSafeInteger(observation.completedAt)&&observation.completedAt>0);
+      assert(Number.isSafeInteger(observation.dependencyIssues)&&observation.dependencyIssues>=0);
+    }else{
+      assert.equal(observation.integrity,'unconfirmed');
+      assert.equal(observation.zipPresent,false);
+    }
+    await closeUI(dir);
     if(kind==='success-long-path'){
       const C=createRequire(import.meta.url)('../assets/recovery-core.cjs'),zip=C.openZip(target);
       try{const manifest=C.validateManifest(zip),file=manifest.files.find(f=>f.path.endsWith('/synthetic.txt'));assert(file);assert.equal(zip.get(file.path).toString(),'SYNTHETIC_LONG_PATH_ONLY');}finally{zip.close();}
     }
-    console.log(JSON.stringify({kind,outcome:observation.outcome,exitDelayMs,receiptWaitMs:terminalShown-receipt.at}));
+    console.log(JSON.stringify({kind,outcome:observation.outcome,receiptAt:receipt.completedAt}));
   }
   results.push({kind,status:'PASS',dir});console.log('PASS native '+kind);
   if(kind==='ordinary-failure')await scenario('success-after-failure',{homeDir});

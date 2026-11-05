@@ -41,4 +41,4 @@
 - `Packer-v0.6.1-Standalone-Recovery.zip` — 完整独立恢复工具。
 - `SHA256SUMS.txt` / 同名 `.sha256` — 精确校验值；本文件不内嵌自哈希。
 
-v0.6.1 已安装到正式环境、提交 GitHub 并更新 DSH Market 条目；Market 审核状态以实际 PR 为准。
+v0.6.1 已安装到正式环境并提交 GitHub；DSH Market 条目将单独提交，审核状态以实际 PR 为准。

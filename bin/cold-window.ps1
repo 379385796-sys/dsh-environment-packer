@@ -20,6 +20,7 @@ function Get-BoundedCoverage($Value) {
   if($null -eq $Value -or $Value.schema -ne 1){return $unknown}
   $state=[string]$Value.state
   if($state -notin @('critical-gaps','no-known-critical-gaps')){return $unknown}
+  if($state -eq 'no-known-critical-gaps' -and ($null -eq $Value.criticalCount -or $Value.criticalCount -ne 0 -or $null -eq $Value.criticalCodes -or @($Value.criticalCodes).Count -ne 0 -or $Value.recoveryBlocked -ne $false -or $null -ne $Value.blockReason -or $Value.truncated -ne $false)){return $unknown}
   $count=0;try{$count=[int]$Value.criticalCount}catch{$count=0};if($count -lt 0){$count=0}
   $codes=@()
   if($null -ne $Value.criticalCodes){$codes=@($Value.criticalCodes|Where-Object{$_ -match '^[A-Z0-9_]{1,64}$'}|Select-Object -Unique -First 8)}

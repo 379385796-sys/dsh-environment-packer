@@ -446,6 +446,7 @@ function Update-PackerAssistantState([hashtable]$View,$State) {
       try{$covCount=[int]$State.coverage.criticalCount}catch{$covCount=0}
       if($null -ne $State.coverage.criticalCodes){$covCodes=@($State.coverage.criticalCodes|Where-Object{$_ -match '^[A-Z0-9_]{1,64}$'}|Select-Object -Unique -First 8)}
       $covBlocked=($covState -eq 'critical-gaps')
+      if($covState -eq 'no-known-critical-gaps' -and ($null -eq $State.coverage.criticalCount -or $State.coverage.criticalCount -ne 0 -or $null -eq $State.coverage.criticalCodes -or @($State.coverage.criticalCodes).Count -ne 0 -or $State.coverage.recoveryBlocked -ne $false -or $null -ne $State.coverage.blockReason -or $State.coverage.truncated -ne $false)){$covState='unknown';$covCount=0;$covCodes=@()}
     }
     $covLabel=$covCodes -join '、'
     $renderKey=@($State.phase,$State.files,$State.bytes,$State.error,$State.failurePhase,$State.failedPhase,$State.writers,$State.exitConfirmed,$State.quitVerified,$State.target,$State.sha256,$State.dependencyIssues,$State.at,$State.zipPresent,$covState,$covCount,$covLabel) -join [char]31

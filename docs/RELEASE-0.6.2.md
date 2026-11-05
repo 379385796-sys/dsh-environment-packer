@@ -8,7 +8,7 @@
 
 | 工作项 | 实现 |
 |---|---|
-| 采集状态与结果闭环 | `client.js`、`index.js`、`lib/cold-task.js`、`assets/migration-archive.cjs`、`bin/cold-backup.mjs`：请求字段按 `absent / present-valid / invalid` 分类；`job.json` 只记协议版本与状态，不记原始请求体或偏好值；非法输入以 `CLIENT_PREFERENCE_INVALID` 明确失败；合法值经 `knownPreference` 校验后归档。字段缺失仍允许归档可完整读取并校验的数据，同时在 `coverage.missing` 保留 `critical:true` 缺口，绝不写入默认偏好冒充采集。 |
+| 采集状态与结果闭环 | `client.js`、`index.js`、`lib/cold-task.js`、`assets/migration-archive.cjs`、`bin/cold-backup.mjs`：请求字段按 `absent / present-valid / invalid` 分类；`clientPreferenceCapture` 仅记协议版本与状态；私有 `job.json` 另含 worker 入档所需的已校验偏好值，不记录原始 HTTP 请求体，公开摘要不含偏好值；非法输入以 `CLIENT_PREFERENCE_INVALID` 明确失败；合法值经 `knownPreference` 校验后归档。字段缺失仍允许归档可完整读取并校验的数据，同时在 `coverage.missing` 保留 `critical:true` 缺口，绝不写入默认偏好冒充采集。 |
 | 有界 coverage 摘要 | `coverageSummary()` 只产生 `schema / state / criticalCount / criticalCodes / truncated / recoveryBlocked / blockReason`，错误码限 8 个且匹配 `^[A-Z0-9_]{1,64}$`，不含路径、正文、凭据或任意输入对象。摘要写入 `manifest.coverage.summary`，`validate()` 校验形状并要求它能由 `coverage.missing` / `coverage.excluded` 重新推导，防止改写清单伪造干净采集。摘要经 `onCommitted` → worker `done` → `terminal.json` → `ui-result.json` → `readUiOverview()` 全链路传递。 |
 | 覆盖字段语义 | `completeWithinDeclaredScope` 改为 `before.missing.length === 0` 的实际计算；`sourceFilesVerified:true` 继续只描述已收录文件的校验，语义不变。 |
 | 终态与历史展示 | `bin/cold-window.ps1`、`bin/cold-window-view.ps1`、`lib/ui-overview.js`、`client.js`：有已知关键缺口显示「归档完成；恢复受阻」并列出缺口码；ZIP 完整性仍单独显示。旧记录无摘要按 `unknown` 处理，不能升级为兼容成功；任何结果都不得宣称「恢复已通过」。成功完整性判据未弱化。 |
@@ -18,6 +18,8 @@
 | 文档与维护说明 | 当前版本/格式/入口说明刷新；列出容量上限；新增最短卸载/清理规程；工具包 `READ-FIRST.txt` 冻结为 v0.6.2 内容。 |
 
 ## 2. 明确不改变的事项
+
+Codex 最终验收补充：自相矛盾的“无关键缺口”摘要保守显示为未知；私有任务文件保留 worker 入档必需的已校验偏好值，公开摘要不含值。新增 Packer-only 合成偏好回归，使用真实宿主验证入档、隔离恢复、两轮启动与提交，并执行首页注入脚本验证首次写入和后续用户修改不被覆盖；该脚本执行使用隔离 localStorage 模型，不代表浏览器全功能认证。
 
 - recovery/2、recovery/3 的严格备份门禁、精确运行时/宿主证明、格式布局与恢复语义原样保留。
 - 依赖分析器严格性、宿主证明、schema 检查、`verify` / `commit` 的 critical 门禁未放宽；本次仅把同一政策前移到 plan/apply。

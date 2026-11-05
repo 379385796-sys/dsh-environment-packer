@@ -51,6 +51,9 @@ try{
 
   $covGap=@{schema=1;state='critical-gaps';criticalCount=1;criticalCodes=@('CLIENT_PREFERENCE_NOT_CAPTURED');truncated=$false;recoveryBlocked=$true;blockReason='CRITICAL_COVERAGE_GAPS'}
   $covClean=@{schema=1;state='no-known-critical-gaps';criticalCount=0;criticalCodes=@();truncated=$false;recoveryBlocked=$false;blockReason=$null}
+  $contradictory=@{schema=1;state='no-known-critical-gaps';criticalCount=1;criticalCodes=@('CLIENT_PREFERENCE_NOT_CAPTURED');truncated=$false;recoveryBlocked=$true;blockReason='CRITICAL_COVERAGE_GAPS'}
+  Update-PackerAssistantState $v @{phase='success';files=1;verified=$true;cleanup=$true;coverage=$contradictory}
+  if($v.resultTitle.Text -notmatch '覆盖状态未记录'){throw 'CONTRADICTORY_COVERAGE_CLEARED'}
   Update-PackerAssistantState $v @{phase='success';files=21064;bytes=50960793;sha256=('a'*64);target=$target;at=1793853731000;dependencyIssues=1;verified=$true;cleanup=$true;coverage=$covGap}
   if($v.title.Text -ne '归档完成；恢复受阻' -or $v.resultTitle.Text -ne '归档完成；恢复受阻'){throw 'BLOCKED_SUCCESS_TITLE_INVALID'}
   if($v.resultCaption.Text -ne 'ZIP 完整性通过' -or $v.resultIntegrity.Text -notmatch '通过'){throw 'BLOCKED_SUCCESS_INTEGRITY_NOT_SEPARATE'}

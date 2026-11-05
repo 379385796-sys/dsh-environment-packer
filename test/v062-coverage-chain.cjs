@@ -123,6 +123,7 @@ const baseOptions=f=>({homeDir:f.home,profileDir:f.profile,dshVersion:'0.2.2-rc.
     assert.equal(n.recoveryBlocked,true);assert.equal(normalizeCoverage(null).state,'unknown');
     assert.equal(normalizeCoverage({schema:1,state:'no-known-critical-gaps',criticalCodes:['<script>']}).criticalCodes.length,0);
     assert.equal(normalizeCoverage({schema:2,state:'critical-gaps'}).state,'unknown');
+    for(const patch of [{criticalCount:1},{criticalCodes:['CLIENT_PREFERENCE_NOT_CAPTURED']},{recoveryBlocked:true},{blockReason:'CRITICAL_COVERAGE_GAPS'},{truncated:true}])assert.equal(normalizeCoverage({...R.coverageSummary([],[]),...patch}).state,'unknown');
   });
 
   // ---- 4. Canonical /4 independent inspection via the existing CLI ----

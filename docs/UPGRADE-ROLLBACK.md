@@ -1,6 +1,17 @@
 # Upgrade and rollback
 
-## Current 0.5.0 release
+> **Current release: v0.6.2.** The two sections below are historical procedures for 0.5.0 and 0.4.2; keep them for provenance but use the v0.6.2 notes first.
+
+## v0.6.2 upgrade / rollback notes
+
+- Upgrade from 0.6.1 uses the same normal offline plugin path (`dsh plugin --profile desktop add <v0.6.2 TGZ> --offline --ignore-scripts`) with all relevant DSH instances normally exited; keep the existing Profile's pnpm store and do not rebuild the whole Profile.
+- **Behaviour change, not a data migration**: 0.6.2 changes capture-state classification, result reporting and the plan/apply gate. It does **not** change `dsh-private-recovery/4`, does not repair or rewrite any existing ZIP, and does not relax recovery/2 or /3. Old `terminal.json` / `ui-result.json` records without a coverage summary are shown as **unknown**, never upgraded to compatible.
+- Verify after restart: `GET /plugins/dsh-environment-packer/defaults` returns `version:0.6.2`; the settings page and the standalone assistant show the new 「归档完成；恢复受阻」 wording for archives with known critical gaps.
+- **Rollback of the plugin**: stop all relevant processes, preserve the failed state, restore only the previous verified Packer payload and its package-manager metadata, and confirm unrelated plugins/conversations/configuration are untouched. A restored old version will again lack the 0.6.2 gap reporting; this is a display/regression difference, not a change to any archive.
+- **Rollback of a recovery attempt** (`assets/migration-engine.cjs`) only disables the activation launcher and keeps the staged transaction/data for diagnosis; it is **not** deletion. Retained task directories, `.<Workspace>.dsh-state-<planId>` state, `.packer-requests-<guid>` request directories and old ZIPs must be handled manually with explicit user choice — see [CLEANUP.md](CLEANUP.md). Do not use wildcard deletion or clean up to hide a failure.
+- The released v0.6.1 tag, Release, attachments and hashes stay untouched; do not repack under the same version. See [RELEASE-0.6.2.md](RELEASE-0.6.2.md).
+
+## Historical 0.5.0 release
 
 Verify the exact tgz SHA-256 and complete restore toolkit first. Normal-exit all Desktop/Host instances; verify and back up the current formal Profile and previous package with private local storage. Record installed versions, template/config hashes, dependency lock and actual pnpm store. Do not migrate the store or force unrelated reinstalls.
 

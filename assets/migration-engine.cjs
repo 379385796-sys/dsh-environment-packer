@@ -40,7 +40,10 @@ function sourceStateHash(p){
 }
 async function apply(p,{confirmPrivate=false,confirmExecution=false,signal,onFile}={}){
   if(!confirmPrivate||!confirmExecution)C.fail('MIGRATION_CONFIRMATION_REQUIRED');P.validatePlan(p);if(!p.canApply)C.fail('MIGRATION_PLAN_BLOCKED');
-  const fresh=await P.plan({zipFile:p.zipFile,installation:p.host.installation,workspace:p.layout.workspace});if(P.digest(fresh)!==P.digest(p))C.fail('PLAN_CHANGED');assertBinding(p);
+  const fresh=await P.plan({zipFile:p.zipFile,installation:p.host.installation,workspace:p.layout.workspace});if(P.digest(fresh)!==P.digest(p))C.fail('PLAN_CHANGED');
+  // Defence in depth: refuse before creating state/workspace when the current
+  // policy guarantees verify/commit can never succeed. No diagnostic staging.
+  if(P.hasUnresolvedCritical(p.issues))C.fail('CRITICAL_DATA_UNVERIFIED');assertBinding(p);
   const l=p.layout;const stat=fs.statfsSync(l.parent);if(Number(stat.bavail)*Number(stat.bsize)<p.spaceBudgetBytes)C.fail('INSUFFICIENT_SPACE');
   fs.mkdirSync(l.state,{mode:0o700});C.privateAccess(l.state,true);
   const guard=await lock(p,true);
@@ -113,7 +116,7 @@ async function boot(p,round,{onReady,port=0}={}){
 async function verifyCore(p,guard){
   assertBinding(p,{staged:true});let s=state(p);if(!['staged','verification-failed'].includes(s.phase))C.fail('TRANSACTION_STATE_INVALID');
   if(s.stagedSHA256!==sourceStateHash(p))C.fail('STAGED_DATA_CHANGED');
-  if(p.issues.some(i=>i.critical!==false))C.fail('CRITICAL_DATA_UNVERIFIED');
+  if(P.hasUnresolvedCritical(p.issues))C.fail('CRITICAL_DATA_UNVERIFIED');
   try{
     const databases=[];for(const d of p.datasets.filter(d=>d.adapter==='sqlite-preserve')){
       const file=memoryPath(p,destination(p,d));C.noLinks(file);const {DatabaseSync}=require('node:sqlite'),db=new DatabaseSync(file,{readOnly:true});try{const result=db.prepare('PRAGMA integrity_check').all();if(result.length!==1||Object.values(result[0])[0]!=='ok')C.fail('DATABASE_INTEGRITY_FAILED');databases.push({path:d.path,integrity:'ok',userVersion:db.prepare('PRAGMA user_version').get().user_version,schemaSHA256:P.digest(db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY name").all())});}finally{db.close();}
@@ -126,7 +129,7 @@ async function verifyCore(p,guard){
   }catch(e){s=state(p);s.error=e.code||'VERIFICATION_FAILED';save(p,s,'verification-failed');throw e;}
 }
 async function commitCore(p,guard){
-  assertBinding(p,{staged:true});const s=state(p);if(s.phase!=='verified'||p.issues.some(i=>i.critical!==false))C.fail('CRITICAL_DATA_UNVERIFIED');
+  assertBinding(p,{staged:true});const s=state(p);if(s.phase!=='verified'||P.hasUnresolvedCritical(p.issues))C.fail('CRITICAL_DATA_UNVERIFIED');
   const receipt=JSON.parse(C.readStable(path.join(p.layout.state,'verification.json')));if(receipt.planSHA256!==p.planSHA256||receipt.status!=='verified'||receipt.verifiedStateSHA256!==sourceStateHash(p)||receipt.requiresStartupValidation!==false)C.fail('VERIFICATION_STALE');
   // A launch entry is published only after verification. The recovered Home stays a sibling of the workspace.
   const quote=v=>"'"+v.replaceAll("'","''")+"'";

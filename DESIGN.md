@@ -1,5 +1,7 @@
 # Cold-backup design, 0.4.2
 
+> **Historical design note.** This document describes the 0.4.2 cold-backup coordination design and is retained for provenance. The v0.6.2 changes (capture-state classification, bounded coverage summary, plan/apply critical gate, result persistence wording) do not alter the writer inspection, source read leases, precommit gate or no-replace commit described below. Current entry points and limits: [README.md](README.md), [MIGRATION.md](docs/MIGRATION.md), [RELEASE-0.6.2.md](docs/RELEASE-0.6.2.md).
+
 The sole ordinary GUI operation selects a ZIP, obtains native per-task confirmation and starts a short Windows PowerShell bootstrap. It uses Start-Process to create the independent WinForms assistant without shared DSH pipes or IPC. A private UUID task, exclusive per-home lock and ready/accepted handshake must complete before the UI advises quitting. A direct Node detached PowerShell 5.1 launch silently exited in local probing; it is not used.
 
 There is no supported whole-Desktop quit bridge in the tested 0.2.1-rc.2. The user normally quits using the existing menu/tray, then confirms that step in the assistant. Neither that button nor an HTTP parameter bypasses inspection. The coordinator tracks writer identities and descendants, queries known writers until a three-second quiet interval, requires explicit exit confirmation, rechecks before worker start, monitors throughout backup and synchronously checks again before commit. Uncertain inspection, timeout or reappearing writers fail closed.

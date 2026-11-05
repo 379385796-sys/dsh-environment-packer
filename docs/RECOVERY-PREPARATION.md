@@ -19,10 +19,30 @@
 
 **全部文件哈希正确，不等于全部业务数据均已备份。仅持有 ZIP，也不保证未来在任意 DSH 版本或任意电脑上可以恢复。** 真正跨设备迁移必须另行实测，不能由同机文件验证推断。
 
+### v0.6.2：当前归档格式的独立检查
+
+`dsh-private-recovery/4`（0.6.0 起的冷备）使用**完整工具包**内的现有入口，不需要运行中的 DSH 或 Agent，不解压、不创建恢复目录、不执行归档插件：
+
+```json
+{"zipFile":"D:\\Backups\\private.zip"}
+```
+
+```text
+node <完整工具包>\assets\migration-cli.cjs inspect --request <私有目录>\inspect-request.json
+```
+
+`ok:true` 只表示检查完成；它没有目标宿主，不返回经过目标验证的 `canRestore`，`postRestoreUsability.state` 恒为 `not-verified`。输出可能含源路径等元数据，请保存在私有目录。`assets/verify-private.cjs --zip` **只适用于 recovery/2、/3**，对 `/4` 返回 `UNSUPPORTED_RECOVERY_FORMAT`，这是入口不匹配而不是载荷损坏。详见 [RESTORE.md](RESTORE.md)。
+
+完整恢复（/4）需要输入**新 DSH 安装目录**与**全新 Workspace 根**，Home 由计划在同级 state 目录生成；旧严格通道才输入全新 Home。当前备份若含 `critical` 覆盖缺口，界面显示「归档完成；恢复受阻」并列出缺口码；计划与 `apply` 会在写盘前拒绝无法解除的关键问题，**不能靠补一个外部文件修复原 ZIP**。
+
+### 容量上限与清理
+
+单文件 128 MiB、单归档总载荷 2 GiB、最多 60,000 条目（含清单/目录保留空间）；超限明确失败，不静默裁剪。恢复另需约 `载荷字节 × 3 + 128 MiB` 的可用空间预算（预算值，不是已发生的残留量）。任务目录、暂存 state、请求目录与旧 ZIP 的核对与处置见 [CLEANUP.md](CLEANUP.md)：保留现场是设计取舍，删除必须由用户明确选择。
+
 恢复只选不存在的全新 Home，父目录必须存在且不能是目录链接。不要选择正式 Home、其子目录或试图覆盖已有目录。源 ZIP、运行时或目标状态在预检后变化会导致重新检查或拒绝恢复。普通错误按原恢复器清理暂存；清理失败、强行结束进程或断电可能留下私人暂存目录，它不代表恢复成功，不能自动合并或直接启动。
 
 操作入口和准确命令见 [RESTORE.md](RESTORE.md)。组件测试与实际窗口、Desktop 启动验收分别记录；本轮同机合成环境的真实恢复与重启通过，不代表跨设备迁移或任意私人业务数据已经验收。
 
-## v0.5.0 toolkit / 恢复工具包
+## 当前工具包（v0.6.2）
 
-Download the complete tgz and checksum from [GitHub Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.5.0), verify SHA-256, then extract into a separate existing tools folder. Keep the entire `package` directory, including `bin`, `assets` and `vendor`; do not copy the EXE alone. / 下载完整 tgz 与校验文件，校验后解开到独立工具目录，保留整个 package 文件夹。备份 ZIP 不含 DSH 安装程序及未收录的外部资源。
+从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载 `Packer-v0.6.2-Standalone-Recovery.zip` 与 `SHA256SUMS.txt`，校验后解开到独立、已存在的工具目录。保留完整 `package` 目录（含 `bin`、`assets`、`vendor`）以及 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`；不要只复制 EXE。备份 ZIP 不含 DSH 安装程序及未收录的外部资源。

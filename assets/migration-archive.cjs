@@ -9,6 +9,26 @@ const FORMAT='dsh-private-recovery/4';
 // conflict and must still stop the archive before any bytes are written.
 const RECORDABLE_DEPENDENCY_CODES=new Set(['DSH_ENGINE_MISMATCH','PEER_VERSION_MISMATCH','HOST_PEER_VERSION_MISMATCH','TRANSITIVE_DEPENDENCY_MISSING','HOST_BROWSER_PEER_UNPROVEN']);
 const MAX_RECORDED_DEPENDENCY_ISSUES=200;
+// A coverage summary contains stable codes and counts only. It never carries
+// payload text, paths, credentials, arbitrary request objects or preference values.
+const MAX_COVERAGE_CODES=8,GAP_CODE=/^[A-Z0-9_]{1,64}$/;
+const COVERAGE_STATES=new Set(['critical-gaps','no-known-critical-gaps']);
+function classifyClientPreferences(clientPreferences){
+  if(clientPreferences===undefined)return {protocol:1,state:'absent',preferences:{}};
+  if(!clientPreferences||typeof clientPreferences!=='object'||Array.isArray(clientPreferences))C.fail('CLIENT_PREFERENCE_INVALID');
+  const keys=Object.keys(clientPreferences);
+  if(keys.length!==1||keys[0]!=='dsh-chat-comfort.settings.v1')C.fail('CLIENT_PREFERENCE_INVALID');
+  // A.knownPreference rejects extra/invalid fields; never substitute a default value.
+  return {protocol:1,state:'present-valid',preferences:{'dsh-chat-comfort.settings.v1':A.knownPreference(clientPreferences['dsh-chat-comfort.settings.v1'])}};
+}
+function coverageSummary(missing,excluded){
+  const gaps=Array.isArray(missing)?missing:[],omitted=Array.isArray(excluded)?excluded:[];
+  const critical=gaps.filter(i=>i&&i.critical===true),needsReview=omitted.filter(i=>i&&i.needsReview===true);
+  const codes=critical.map(i=>typeof i.code==='string'&&GAP_CODE.test(i.code)?i.code:'UNKNOWN_CRITICAL_GAP');
+  if(needsReview.length)codes.push('HOME_ITEM_UNCLASSIFIED');
+  const unique=[...new Set(codes)],count=critical.length+needsReview.length;
+  return {schema:1,state:count?'critical-gaps':'no-known-critical-gaps',criticalCount:count,criticalCodes:unique.slice(0,MAX_COVERAGE_CODES),truncated:unique.length>MAX_COVERAGE_CODES,recoveryBlocked:count>0,blockReason:count>0?'CRITICAL_COVERAGE_GAPS':null};
+}
 const OMIT_HOME=new Set(['profiles','cache','logs','telemetry','dsh-runtimes','.packer-cold','subagent-gc-backup','.anonymous-user-id','dsh-skills-manager.log','PACKER-CLIENT-PREFERENCES.json','PACKER-RESTORE-RESULT.json','PACKER-TOOL-PROVENANCE.json']);
 const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','AGENTS.md','.credentials.yaml','.credentials.yml','settings.yaml','settings.yaml.imported','cordis.patch.yml','.env','dsh-claude-style','rewind-snapshots','skills-manager','llm-deepseek','archive-manager','aik_auto_memory_use','dsh-market','dsh-builtin-browser-host','models','emoji-packs','whale-audio','whale-bubble-imgs','whale-roles','.dshw-size.json','.dshw-turn.json','.dshw-usage.json']);
 async function legacy(){return import(pathToFileURL(path.join(__dirname,'../lib/private-backup.js')).href);}
@@ -45,9 +65,11 @@ async function discover({homeDir,profileDir,workspaceRoot,agentsDir,clientPrefer
     const captured=roots.some(r=>['memory','skills'].includes(r.kind)&&A.canonical(r.path)===A.canonical(path.join(homeDir,name)));
     excluded.push({name,reason:captured?'captured-as-data-root':OMIT_HOME.has(name)||name.startsWith('.deployment-rollback')?'runtime-cache-history-or-task':name==='plugins-local'?'unclassified-source-tree':'unclassified-home-entry',needsReview:!captured&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')});
   }
-  const preferences=clientPreferences===undefined?{}:{'dsh-chat-comfort.settings.v1':A.knownPreference(clientPreferences['dsh-chat-comfort.settings.v1'])};
-  if(clientPreferences===undefined&&fs.existsSync(path.join(profileDir,'node_modules/dsh-chat-comfort/package.json')))missing.push({code:'CLIENT_PREFERENCE_NOT_CAPTURED',critical:true});
-  return {roots,missing,excluded,preferences,mnemonCliPaths};
+  const capture=classifyClientPreferences(clientPreferences),preferences=capture.preferences;
+  // An absent field is a real, critical capture gap. Data preservation still
+  // proceeds; it must never be reported as a successful capture.
+  if(capture.state==='absent'&&fs.existsSync(path.join(profileDir,'node_modules/dsh-chat-comfort/package.json')))missing.push({code:'CLIENT_PREFERENCE_NOT_CAPTURED',critical:true});
+  return {roots,missing,excluded,preferences,capture,mnemonCliPaths};
 }
 async function inventory(options){
   const base=await legacy(),layout=await discover(options),old=base.inventory(options.profileDir,options.homeDir);
@@ -109,6 +131,16 @@ function validate(zip){
     if(!c||typeof c!=='object'||Array.isArray(c)||!Number.isSafeInteger(c.dependencyIssueCount)||c.dependencyIssueCount<0||!Array.isArray(c.dependencyIssues)||c.dependencyIssues.length>c.dependencyIssueCount||!Array.isArray(c.optionalMissing))C.fail('INVALID_MIGRATION_MANIFEST');
     for(const i of c.dependencyIssues)if(!i||typeof i.code!=='string'||!/^[A-Z0-9_]{1,100}$/.test(i.code)||(i.actual!==null&&typeof i.actual!=='string')||(i.range!==null&&typeof i.range!=='string'))C.fail('INVALID_MIGRATION_MANIFEST');
   }
+  // Old /4 archives have no summary; when present it must be a bounded, stable
+  // code list so a rewritten manifest cannot fabricate a clean capture.
+  if(m.coverage.summary!==undefined){
+    const s=m.coverage.summary;
+    const gapState=s&&s.state==='critical-gaps';
+    if(!s||typeof s!=='object'||Array.isArray(s)||s.schema!==1||!COVERAGE_STATES.has(s.state)||!Number.isSafeInteger(s.criticalCount)||s.criticalCount<0||(gapState?!s.criticalCount:s.criticalCount>0)||!Array.isArray(s.criticalCodes)||s.criticalCodes.length>MAX_COVERAGE_CODES||s.criticalCodes.some(c=>typeof c!=='string'||!GAP_CODE.test(c))||!gapState&&s.criticalCodes.length>0||typeof s.recoveryBlocked!=='boolean'||s.recoveryBlocked!==gapState||s.blockReason!==(gapState?'CRITICAL_COVERAGE_GAPS':null))C.fail('INVALID_MIGRATION_MANIFEST');
+    // The summary must be derivable from the recorded coverage; otherwise a
+    // rewritten manifest could claim a clean capture while keeping the gaps.
+    if(JSON.stringify(s)!==JSON.stringify(coverageSummary(m.coverage.missing,m.coverage.excluded)))C.fail('INVALID_MIGRATION_MANIFEST');
+  }
   const all=new Map(),ids=new Set();for(const r of m.roots){if(typeof r.id!=='string'||!/^[a-z0-9-]+$/.test(r.id)||ids.has(r.id)||!['home','profile','workspace','memory','skills','agents'].includes(r.kind)||typeof r.path!=='string'||!path.win32.isAbsolute(r.path))C.fail('INVALID_MIGRATION_ROOT');ids.add(r.id);}
   for(const [list,type]of [[m.directories,'dir'],[m.files,'file']])for(const f of list){const n=type==='file'?f.path:f;C.safeName(n);if(!/^(profiles\/desktop\/|home-data\/|packages\/|preferences\/|workspaces\/)/.test(n)||all.has(n.toLowerCase()))C.fail('INVALID_MIGRATION_SCOPE');all.set(n.toLowerCase(),type);if(type==='file'&&(!/^[a-f0-9]{64}$/.test(f.sha256)||!Number.isSafeInteger(f.bytes)||f.bytes<0))C.fail('INVALID_MANIFEST');}
   for(const [n]of all){if(n.startsWith('workspaces/')&&!ids.has(n.split('/')[1]))C.fail('INVALID_MIGRATION_ROOT');const parts=n.split('/');parts.pop();while(parts.length){if(all.get(parts.join('/'))==='file')C.fail('ARCHIVE_PATH_COLLISION');parts.pop();}}
@@ -141,12 +173,13 @@ async function createBackup(options){
     const dependencyIssues=dependencyCheck.issues.map(i=>({code:i.code,package:i.package??null,name:i.name??null,range:i.range??null,actual:i.actual??null,kind:i.kind??null,realm:i.realm??null,state:'recorded'}));
     const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
     const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,completeWithinDeclaredScope:true,engineeringSourceExcluded:true,installerExcluded:true}};
+    const summary=coverageSummary(before.missing,before.excluded);
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;
-    const result={path:target,sha256,bytes:fs.statSync(target).size,files:records.length,manifest:m,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,cleanup:{tempRemoved:false}};options.onCommitted?.({path:target,sha256,bytes:result.bytes,files:records.length,verified:true});fs.unlinkSync(temp);result.cleanup.tempRemoved=true;return result;
+    const result={path:target,sha256,bytes:fs.statSync(target).size,files:records.length,manifest:m,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,coverageSummary:summary,cleanup:{tempRemoved:false}};options.onCommitted?.({path:target,sha256,bytes:result.bytes,files:records.length,verified:true,coverageSummary:summary});fs.unlinkSync(temp);result.cleanup.tempRemoved=true;return result;
   }catch(e){writer?.close();if(!options.preserveFailureArtifacts){if(committed&&C.identity(fs.lstatSync(target))===tempId)fs.unlinkSync(target);if(fs.existsSync(temp))fs.unlinkSync(temp);}throw e;}
 }
 function readArchive(file){const zip=C.openZip(file);try{const head=JSON.parse(zip.get('manifest.json'));if(head.format===FORMAT)return {zip,manifest:validate(zip),legacy:false};const m=require('./verify-private.cjs').validateArchive(zip);return {zip,manifest:{format:m.format,schemaVersion:0,mode:'environment-migration',producerVersion:m.packerVersion,sourceRuntime:{...m.compatibility,nodeModules:m.compatibility.nodeModules,nodeMajor:m.compatibility.nodeMajor},roots:[{id:'home',kind:'home',path:'Z:\\legacy-unknown-home'},{id:'profile',kind:'profile',path:'Z:\\legacy-unknown-home\\profiles\\desktop'}],files:m.files.map(f=>({...f,path:f.path.startsWith('profile/')?'profiles/desktop/'+f.path.slice(8):'home-data/'+f.path.slice(5),archivePath:f.path})),directories:m.directories.map(n=>n.startsWith('profile/')?'profiles/desktop/'+n.slice(8):'home-data/'+n.slice(5)),packages:[],coverage:{missing:[{code:'LEGACY_COVERAGE_INCOMPLETE',critical:true}],excluded:m.exclusions||[]}},legacy:true};}catch(e){zip.close();throw e;}}
-module.exports={FORMAT,discover,inventory,createBackup,validate,readArchive};
+module.exports={FORMAT,classifyClientPreferences,coverageSummary,discover,inventory,createBackup,validate,readArchive};

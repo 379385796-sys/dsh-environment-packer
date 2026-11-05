@@ -1,8 +1,19 @@
-# DSH Environment Packer · v0.6.1
+# DSH Environment Packer · v0.6.2
 
 **环境恢复包：为 DSH 创建私人冷备份，并在新路径、新兼容宿主上恢复环境。**
 
-[下载 v0.6.1](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.1) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md)
+[下载 v0.6.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
+
+## 0.6.2 最小可靠性修正（候选）
+
+- **采集状态与结果闭环**：客户端偏好字段的 `absent / present-valid / invalid` 状态被明确记录；关键覆盖缺口以有界、仅含稳定错误码的摘要从归档结果传到 worker 终态、`ui-result.json`、Packer 任务历史与成功页。字段缺失仍允许保全可读取的数据，但绝不显示为采集成功。
+- **「归档完成；恢复受阻」**：存在已知关键缺口时，成功页、任务记录明确显示该结论与缺口码；ZIP 完整性、恢复兼容性、恢复后业务可用性仍然分开表述。没有目标宿主检查时不宣称兼容成功；旧记录缺摘要按未知处理。
+- **必败恢复不暂存**：计划与 `apply` 预检都拒绝当前流程无法解除的 critical 问题，在创建 state/workspace 之前结束；`verify/commit` 的纵深防御保留。
+- **结果持久化失败可见**：`ui-result.json` 写入失败时，成功/失败/取消/中断四种终态都不再显示「结果已保留」。
+- **独立检查入口**：recovery/4 使用 `assets/migration-cli.cjs inspect`；`verify-private.cjs` 仅适用于 recovery/2、/3。检查成功不等于恢复可提交。
+- 补齐容量上限、最短卸载/清理规程，以及 recovery/2、/3 与 recovery/4 的入口区分。
+
+**本版不修复旧归档**：v0.6.1 正式验证 ZIP 仍有 `CLIENT_PREFERENCE_NOT_CAPTURED` 关键覆盖缺口与已记录依赖冲突。该包完整性通过，可作为数据保全产物保留，但现有受支持完整恢复流程不能提交；当前工具不支持对原包补录偏好。源环境仍可用时，请用 v0.6.2 另建新备份并验证，不要修改原 ZIP。
 
 ## 0.6.1 定向修复
 
@@ -22,12 +33,12 @@
 
 ## 下载与安装
 
-从 [v0.6.1 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.1) 下载：
+从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载：
 
 | 文件 | 用途 |
 |---|---|
-| `dsh-environment-packer-0.6.1.tgz` | DSH 插件安装包 |
-| `Packer-v0.6.1-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
+| `dsh-environment-packer-0.6.2.tgz` | DSH 插件安装包 |
+| `Packer-v0.6.2-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
 | `SHA256SUMS.txt` / 同名 `.sha256` | 下载校验值 |
 
 保存当前环境并正常退出 DSH，使用当前 Desktop 随附的官方插件管理流程安装本地 TGZ。已配置 CLI 时可用：
@@ -36,7 +47,7 @@
 dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 ```
 
-升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 0.6.1。独立恢复工具请保留完整目录，不能只复制 EXE。
+升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 0.6.2。独立恢复工具请保留完整目录，不能只复制 EXE。
 
 ## 备份与恢复
 
@@ -45,13 +56,15 @@ dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 1. 从 Packer 的备份入口选择新的 ZIP 路径，确认私人数据提示。
 2. 等待独立冷备份助手接管，再保存工作并正常退出全部 DSH 实例，包括托盘。
 3. 回到助手确认继续，等待进程检查、文件锁、一致性检查和 ZIP 校验完成。已有 ZIP 不覆盖。
+4. **看清终态结论**：「归档完成」只说明已收录文件的完整性通过；若显示「归档完成；恢复受阻」，说明存在已知关键覆盖缺口，现有受支持完整恢复流程不能提交，请保留该包作数据保全并在源环境可用时重新备份。
 
 **B 电脑恢复**
 
-1. 先安装可信、兼容的 DSH；解压完整恢复工具，运行 `Open-Recovery.ps1` 或 `package/bin/restore-assistant.exe`。
+1. 先安装可信、兼容的 DSH；解压完整恢复工具，运行 `Open-Recovery.ps1` 或 `package/bin/restore-assistant.exe`。该 EXE 进入 **recovery/4 迁移界面**；旧严格恢复（recovery/2、/3）在界面内的「严格恢复」按钮中。
 2. 选择 ZIP、**新 DSH 安装目录**和**新 Workspace 根目录**。
-3. 核对自动生成的迁移计划，确认后执行。Home、Profile、agents 与必要数据由计划安排。
-4. 恢复器在独立新目录暂存，验证依赖、数据及宿主启动/重启后才提交；失败保留诊断并安全回退。
+3. 只想只读检查归档（不需要运行中的 DSH）时，使用 `package/assets/migration-cli.cjs inspect --request <私有目录>/inspect-request.json`，请求文件为 `{"zipFile":"<ZIP 绝对路径>"}`。详见 [RESTORE.md](docs/RESTORE.md)。
+4. 核对自动生成的迁移计划与「关键阻断码」，确认后执行。计划或 `apply` 会在写盘前拒绝当前流程无法解除的关键问题。
+5. 恢复器在独立新目录暂存，验证依赖、数据及宿主启动/重启后才提交；失败保留诊断并安全回退。
 
 迁移按 `inspect → plan → apply → verify → commit / rollback` 执行。旧电脑和新电脑不需要相同路径；多个历史 cwd 保持稳定的独立映射。只修改已识别结构化路径，不盲目替换会话正文或 Prompt。
 
@@ -65,4 +78,6 @@ dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 - 旧 recovery/2、recovery/3 的 strict-restore 仍保持原精确运行时和证明限制。
 - 隔离目录与进程内限制不是恶意原生插件的操作系统沙箱，只使用可信归档。
 
-详见 [迁移通道](docs/MIGRATION.md)、[变更记录](CHANGELOG.md) 和 [v0.6.1 发布说明](docs/RELEASE-0.6.1.md)。
+**容量上限**：单文件 128 MiB、单个归档总载荷 2 GiB、最多 60,000 个条目（含清单与目录保留空间）；超出会在冷备时明确失败。恢复另需约 `载荷字节 × 3 + 128 MiB` 的可用空间预算。详见 [BUILD-TEST.md](docs/BUILD-TEST.md)。
+
+详见 [迁移通道](docs/MIGRATION.md)、[恢复与独立检查](docs/RESTORE.md)、[卸载与清理](docs/CLEANUP.md)、[变更记录](CHANGELOG.md) 和 [v0.6.2 发布说明](docs/RELEASE-0.6.2.md)。

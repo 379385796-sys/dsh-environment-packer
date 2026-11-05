@@ -1,4 +1,4 @@
-# v0.6.1 migration channel
+# recovery/4 migration channel（current: v0.6.2）
 
 This channel is independent of the unchanged `recovery/2` and `recovery/3` strict-restore implementation. Keep the complete tool directory and a trusted DSH installation. The assistant works without starting the ordinary DSH desktop first; target runtime inspection still requires its executable. No AI, download, installer, or installation lifecycle hook is used by recovery.
 
@@ -18,11 +18,17 @@ The fresh Home, desktop Profile, agents, Electron userData, external data and lo
 
 The engine performs `inspect → plan → apply → verify → commit / rollback`. Verification uses the real target runtime: dependency resolution, native module loading, schema-aware storage access, Session and workspace reads, Skills body reads, supported preference bootstrap, database integrity/owner reads, and startup, normal shutdown and restart. Commit requires a bound successful receipt and no critical unknowns. Only then is a guarded activation launcher enabled. A verification failure cannot become full recovery success.
 
-Rollback disables activation and preserves the new transaction/data for diagnosis; it does not delete the old environment or erase newly written user data. A running/unproven DSH process prevents unsafe rollback. Retry with a fresh target after inspecting diagnostics. A crash before durable commit leaves activation disabled; owned unchanged partial publication can be retried.
+**v0.6.2 gate**: `plan.canApply` and the `apply` precheck now apply the same `hasUnresolvedCritical` policy as `verify`/`commit`. A critical issue that the current flow cannot resolve (an unresolved dependency conflict, a critical coverage gap, an unknown critical dataset, an unverified target capability) is refused **before any state/workspace directory is created**. `verify`/`commit` keep their original defence in depth. There is no "diagnostic staging" mode for a deterministic dead end; if a future flow can genuinely resolve a class of unknowns, it must define that verification transition explicitly rather than merely relaxing `canApply`. The migration interface lists the critical blocking codes and no longer calls every blocked or unknown issue a dependency conflict.
+
+Rollback disables activation and preserves the new transaction/data for diagnosis; it does not delete the old environment or erase newly written user data. A running/unproven DSH process prevents unsafe rollback. Retry with a fresh target after inspecting diagnostics. A crash before durable commit leaves activation disabled; owned unchanged partial publication can be retried. Retained state, request directories and old ZIPs are never deleted automatically; see [CLEANUP.md](CLEANUP.md) for the shortest manual procedure.
+
+**Archive limits**: 128 MiB per file, 2 GiB total payload, 60,000 entries (including manifest/directory headroom). Recovery requires a free-space budget of `payloadBytes × 3 + 128 MiB`; this is a precheck budget, not the size of data already written. Limits fail explicitly rather than trimming data.
 
 ## Deterministic interfaces
 
 `assets/migration-engine.cjs` exports `inspect`, `plan`, `apply`, `verify`, `commit`, `rollback`. GUI and CLI share it. `assets/migration-cli.cjs <action> --request <absolute-json-file>` emits one JSON result envelope, `{ok,result}` or `{ok:false,code}`. Use a supported Node runtime or the target executable in its supported Node mode. Requests and output must be stored in a private directory.
+
+`inspect` is also the **canonical independent read-only check for recovery/4**: it needs no running DSH, no target installation parameter, creates no recovery directory and executes no archived plugin. Store `{"zipFile":"<absolute ZIP path>"}` in a private UTF-8 request file and run `node assets/migration-cli.cjs inspect --request <absolute request file>`. `ok:true` means the inspection completed, not that a restore can commit; `postRestoreUsability` stays `not-verified`. Output can contain source paths, so keep it private. `assets/verify-private.cjs` remains the strict /2 and /3 reader and returns `UNSUPPORTED_RECOVERY_FORMAT` for /4 by design.
 
 `inspect` accepts `{zipFile}`; `plan` accepts `{zipFile, installation, workspace}`. Execution requests contain the complete returned `plan`; `apply`/`restore` additionally require `confirmPrivate: true, confirmExecution: true`. `restore` sequences apply, verify, commit and attempts safe rollback on failure. The individual operations allow diagnostic tooling to inspect a stopped transaction. A plan checksum is an identity binding, not a signature or permission token. The plan is rederived before apply, and archive, host, directory identities and executable toolkit contents are checked again. Editing a plan or using changed tool files requires a new plan; AI cannot bypass this boundary.
 

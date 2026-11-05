@@ -1,5 +1,7 @@
 # v0.5.0 — Offline disaster recovery / 离线灾难恢复
 
+> **Historical release notes.** Retained for provenance; this is not the current release. Current: [v0.6.2 release notes](docs/RELEASE-0.6.2.md), [README.md](README.md).
+
 ## 中文
 
 - 新增保守的备份覆盖报告和独立 ZIP 只读检查，分别显示完整性、恢复兼容性和待启动验收状态。

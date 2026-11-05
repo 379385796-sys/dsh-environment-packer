@@ -70,5 +70,11 @@ try {
  responses.push(reply({ok:true,code:'COLD_LEGACY_RECOVERED'}));await action('confirm-legacy').props.onClick();assert.deepEqual(JSON.parse(requests.at(-1).body),{confirmLegacyTaskId:'legacy-id'});assert.match(status(),/旧任务已经安全退役/);assert(!action('confirm-legacy'));
  responses.push(reply({ok:true,profileDirectory:'D:\\Synthetic\\profiles\\desktop',taskOverview:{state:'no-lock',history:[{id:'synthetic-record',phase:'failed',files:0,record:'available',diagnostic:{issueCount:7,issues:[]}}]}}));await action('refresh').props.onClick();assert.equal(requests.at(-1).method,undefined);tab('备份').props.onClick();assert.match(text(render()),/7 项兼容性问题/);assert(!text(render()).includes('24 项'));
  responses.push(reply({ok:false,error:'SAVE_DIALOG_FAILED'},500));await action('create').props.onClick();assert.equal(tab('帮助与诊断').props['aria-selected'],true);assert(action('manual-target').props.disabled,'empty fallback path cannot submit');
+ // Invalid preference capture must be reported clearly, never silently defaulted.
+ tab('备份').props.onClick();responses.push(reply({ok:false,error:'CLIENT_PREFERENCE_INVALID'},500));await action('create').props.onClick();assert.match(status(),/格式不合法/);assert.match(status(),/不会用默认值冒充已采集/);
+ // A persisted critical gap is visible in the task history and never labelled success.
+ tab('任务与恢复').props.onClick();
+ responses.push(reply({ok:true,profileDirectory:'D:\\Synthetic\\profiles\\desktop',taskOverview:{state:'no-lock',history:[{id:'blocked-record',phase:'success',files:69,result:{outcome:'success',integrity:'verified',dependencyIssues:1,recoveryState:'blocked',coverage:{schema:1,state:'critical-gaps',criticalCount:1,criticalCodes:['CLIENT_PREFERENCE_NOT_CAPTURED'],recoveryBlocked:true},target:'D:\\Synthetic\\private.zip'}}]}}));
+ await action('refresh').props.onClick();assert.match(text(render()),/归档完成；恢复受阻/);assert.match(text(render()),/CLIENT_PREFERENCE_NOT_CAPTURED/);assert.match(text(render()),/受支持恢复流程被阻断/);assert.match(text(render()),/完整性：ZIP 结构/);
 } finally {globalThis.fetch=originalFetch;delete globalThis.window;}
-console.log('PASS three sections, handoff/cancel/busy guards, evidence then confirmation, actual diagnostic counts and fallback visibility');
+console.log('PASS three sections, handoff/cancel/busy guards, actual diagnostic counts, fallback visibility, invalid capture and blocked-coverage history');

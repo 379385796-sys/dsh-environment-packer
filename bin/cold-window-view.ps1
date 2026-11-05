@@ -425,10 +425,30 @@ function New-PackerAssistantView([string]$Target) {
   return $view
 }
 
+function Set-PackerRecordDurability([hashtable]$View,[bool]$Durable) {
+  # Every terminal outcome must report persistence truthfully. ZIP integrity
+  # and the durability of ui-result.json are independent facts.
+  if($Durable){return}
+  $View.hint.Visible=$true
+  $View.hint.Text='结果记录写入失败（ui-result.json 未持久保存）；请保留此窗口并检查任务目录中的原始记录。ZIP 完整性与本次结果记录的持久性分别判断。'
+  $View.resultNote.Text=$View.resultNote.Text+' 结果记录未持久保存，请勿仅凭本页认定结果已留档。'
+  $View.resultNote.AccessibleName=$View.resultNote.Text
+}
+
 function Update-PackerAssistantState([hashtable]$View,$State) {
   # Existing records are observations, not new safety decisions. Missing failure stages stay unknown.
   try {
-    $renderKey=@($State.phase,$State.files,$State.bytes,$State.error,$State.failurePhase,$State.failedPhase,$State.writers,$State.exitConfirmed,$State.quitVerified,$State.target,$State.sha256,$State.dependencyIssues,$State.at,$State.zipPresent) -join [char]31
+    # Coverage is a bounded, code-only projection of the archive's capture gaps.
+    # A missing/malformed summary is 'unknown' for old records, never a clean result.
+    $covState='unknown';$covCount=0;$covCodes=@();$covBlocked=$false
+    if($null -ne $State.coverage -and $State.coverage.schema -eq 1 -and $State.coverage.state -in @('critical-gaps','no-known-critical-gaps')){
+      $covState=[string]$State.coverage.state
+      try{$covCount=[int]$State.coverage.criticalCount}catch{$covCount=0}
+      if($null -ne $State.coverage.criticalCodes){$covCodes=@($State.coverage.criticalCodes|Where-Object{$_ -match '^[A-Z0-9_]{1,64}$'}|Select-Object -Unique -First 8)}
+      $covBlocked=($covState -eq 'critical-gaps')
+    }
+    $covLabel=$covCodes -join '、'
+    $renderKey=@($State.phase,$State.files,$State.bytes,$State.error,$State.failurePhase,$State.failedPhase,$State.writers,$State.exitConfirmed,$State.quitVerified,$State.target,$State.sha256,$State.dependencyIssues,$State.at,$State.zipPresent,$covState,$covCount,$covLabel) -join [char]31
     if($View.RenderKey -ceq $renderKey){return}
     $phase=[string]$State.phase;$map=@{'waiting'=0;'exit-verified'=1;'scanning'=1;'checking-dependencies'=1;'writing'=2;'verifying'=3;'success'=4}
     if($phase -notin @('failed','success','cancelled','unknown','initial') -and $map.ContainsKey($phase)){$View.LastPhase=$phase}
@@ -443,8 +463,8 @@ function Update-PackerAssistantState([hashtable]$View,$State) {
     $View.steps.Complete=$phase -eq 'success';$View.steps.FailureKnown=$View.FailureKnown
     $View.steps.Active=if($phase -eq 'failed'){if($View.FailureKnown){$map[$failurePhase]}else{-1}}elseif($phase -eq 'cancelled' -or $phase -eq 'unknown'){if($View.LastPhase){$map[$View.LastPhase]}else{-1}}elseif($map.ContainsKey($phase)){$map[$phase]}else{-1}
     $View.glyph.Kind=$phase
-    $View.title.Text=switch($phase){'waiting'{if($State.exitConfirmed){'等待相关进程正常退出'}else{'请先正常退出 DSH'}} 'initial'{'正在连接独立助手'} 'exit-verified'{'正在检查备份环境'} 'scanning'{'正在扫描环境文件'} 'checking-dependencies'{'正在检查依赖兼容性'} 'writing'{'正在打包环境'} 'verifying'{'正在验证备份完整性'} 'success'{'备份成功'} 'failed'{'备份失败'} 'cancelled'{'任务已取消'} 'unknown'{'结果未确认'} default{'任务状态未知'}}
-    $View.subtitle.Text=switch($phase){'waiting'{'助手已接管。保存工作后，正常退出所有 DSH 实例（包括托盘）。'} 'initial'{'请暂时保持 DSH 运行，等待接管完成。'} 'success'{'ZIP 已写入并通过完整性校验。'} 'failed'{if($View.FailureKnown){'失败阶段：'+$phaseLabels[$failurePhase]}elseif($View.LastPhase){'失败阶段未记录；最后观察到：'+$phaseLabels[$View.LastPhase]}else{'失败阶段未记录；不能确认错误发生在哪一步。'}} 'cancelled'{'任务在完成前被取消；未生成有效 ZIP。'} 'unknown'{'助手或协调器未留下完整终态；不能视为成功。'} default{'保持电脑开启，等待现有安全检查和任务流程完成。'}}
+    $View.title.Text=switch($phase){'waiting'{if($State.exitConfirmed){'等待相关进程正常退出'}else{'请先正常退出 DSH'}} 'initial'{'正在连接独立助手'} 'exit-verified'{'正在检查备份环境'} 'scanning'{'正在扫描环境文件'} 'checking-dependencies'{'正在检查依赖兼容性'} 'writing'{'正在打包环境'} 'verifying'{'正在验证备份完整性'} 'success'{if($covBlocked){'归档完成；恢复受阻'}elseif($covState -eq 'unknown'){'归档完成（覆盖状态未记录）'}else{'归档完成'}} 'failed'{'备份失败'} 'cancelled'{'任务已取消'} 'unknown'{'结果未确认'} default{'任务状态未知'}}
+    $View.subtitle.Text=switch($phase){'waiting'{'助手已接管。保存工作后，正常退出所有 DSH 实例（包括托盘）。'} 'initial'{'请暂时保持 DSH 运行，等待接管完成。'} 'success'{if($covBlocked){'ZIP 已写入并通过完整性校验；已知关键数据未采集，受支持恢复流程被阻断。'}elseif($covState -eq 'unknown'){'ZIP 已写入并通过完整性校验；本次记录未含覆盖摘要。'}else{'ZIP 已写入并通过完整性校验；恢复仍需目标检查。'}} 'failed'{if($View.FailureKnown){'失败阶段：'+$phaseLabels[$failurePhase]}elseif($View.LastPhase){'失败阶段未记录；最后观察到：'+$phaseLabels[$View.LastPhase]}else{'失败阶段未记录；不能确认错误发生在哪一步。'}} 'cancelled'{'任务在完成前被取消；未生成有效 ZIP。'} 'unknown'{'助手或协调器未留下完整终态；不能视为成功。'} default{'保持电脑开启，等待现有安全检查和任务流程完成。'}}
     $View.count.Visible=$phase -notin @('waiting','initial');$View.unit.Visible=$View.count.Visible
     $displayCount=if($phase -eq 'failed'){if($valid -and $number -gt 0){$number}else{$View.LastFiles}}elseif($valid){$number}else{$null}
     $View.count.Text=if($null -ne $displayCount){$displayCount.ToString('N0')}else{'—'}
@@ -468,7 +488,7 @@ function Update-PackerAssistantState([hashtable]$View,$State) {
       '^ARCHIVE_LIMIT$'{'数据量超过单个归档上限。';break}
       default{'任务未能完成，请查看保留的诊断。'}
     }
-    $View.instructions.Text=switch($phase){'waiting'{if($State.exitConfirmed){'已收到人工确认，等待检测通过。相关进程：'+$State.writers}else{'1  正常退出 DSH     →     2  回到这里确认'}} 'initial'{'助手确认接管后，再正常退出 DSH。'} 'failed'{$reason+$(if($State.error){' ['+$State.error+']'}else{''})} 'cancelled'{'已标记为取消，不会显示为成功。'} 'unknown'{'未确认的 ZIP 不得当作成功备份。'} 'success'{'文件校验通过不等于恢复业务通过；恢复后仍需独立验收。'} default{''}}
+    $View.instructions.Text=switch($phase){'waiting'{if($State.exitConfirmed){'已收到人工确认，等待检测通过。相关进程：'+$State.writers}else{'1  正常退出 DSH     →     2  回到这里确认'}} 'initial'{'助手确认接管后，再正常退出 DSH。'} 'failed'{$reason+$(if($State.error){' ['+$State.error+']'}else{''})} 'cancelled'{'已标记为取消，不会显示为成功。'} 'unknown'{'未确认的 ZIP 不得当作成功备份。'} 'success'{if($covBlocked){'已知关键覆盖缺口阻断受支持恢复流程；本包仅用于数据保全。'}else{'文件校验通过不等于恢复业务通过；恢复后仍需独立验收。'}} default{''}}
     $View.progress.Visible=$phase -in @('exit-verified','scanning','checking-dependencies','writing','verifying')
     $View.hint.Text=if($phase -eq 'waiting'){'人工确认不能绕过检测；超时将安全取消。'}elseif($phase -eq 'failed'){'请自行启动 DSH，在 Packer 查看诊断并检查异常任务，再使用新 ZIP 名称重试。'}elseif($phase -eq 'success'){'不会自动重启 DSH；结果会保留到你主动关闭。'}elseif($phase -eq 'cancelled'){'如仍需备份，请重新发起。'}elseif($phase -eq 'unknown'){'请在 Packer 的“任务与恢复”中查看最近记录。'}elseif($phase -eq 'initial'){'尚未开始备份。'}else{'当前阶段进行中 · 不估算整体百分比'}
     $View.hint.Visible=$phase -notin @('success','failed','cancelled','unknown')
@@ -482,17 +502,28 @@ function Update-PackerAssistantState([hashtable]$View,$State) {
       $sha=if([string]$State.sha256 -match '^[a-f0-9]{64}$'){[string]$State.sha256}else{''}
       $at=$null;if($State.at){try{$at=[DateTimeOffset]::FromUnixTimeMilliseconds([long]$State.at).ToLocalTime()}catch{}}
       $conflicts=0;if($null -ne $State.dependencyIssues){try{$conflicts=[int]$State.dependencyIssues}catch{$conflicts=0}}
-      $View.resultTitle.Text=if($phase -eq 'success'){'备份成功'}elseif($phase -eq 'failed'){'备份失败'}elseif($phase -eq 'cancelled'){'任务已取消'}else{'结果未确认'}
+      $View.resultTitle.Text=if($phase -eq 'success'){if($covBlocked){'归档完成；恢复受阻'}elseif($covState -eq 'unknown'){'归档完成（覆盖状态未记录）'}else{'归档完成'}}elseif($phase -eq 'failed'){'备份失败'}elseif($phase -eq 'cancelled'){'任务已取消'}else{'结果未确认'}
       $View.resultTime.Text=if($null -ne $at){'完成时间 '+$at.ToString('yyyy-MM-dd HH:mm:ss')}else{''}
       $View.resultSummary.Text=if($phase -eq 'success'){(@($(if($displayCount){$displayCount.ToString('N0')+' 个文件'}),$(if($bytes){($bytes/1MB).ToString('0.##')+' MB'}))|Where-Object {$_}) -join ' · '}elseif($phase -eq 'failed'){'失败原因：'+$reason}elseif($phase -eq 'cancelled'){'任务在完成前被取消。'}else{'助手或协调器未留下完整终态。'}
       $View.resultPathCaption.Visible=$phase -eq 'success';$View.resultPathPanel.Visible=$phase -eq 'success'
       $View.resultHashCaption.Visible=$phase -eq 'success';$View.resultHashPanel.Visible=$phase -eq 'success'
       $View.resultPath.Text=if($target){[string]$target}else{''};$View.resultHash.Text=$sha
       $View.resultIntegrity.Text=if($phase -eq 'success'){'ZIP 完整性：结构、CRC、清单与全部载荷哈希通过。'}elseif($State.zipPresent -eq $true){'有效 ZIP：存在未确认文件，请勿当作成功备份。'}elseif($phase -eq 'unknown'){'有效 ZIP：无法确认。'}else{'有效 ZIP：未生成。'}
-      $View.compatWarning.Visible=$phase -eq 'success' -and $conflicts -gt 0
-      $View.compatWarningTitle.Text=if($View.compatWarning.Visible){'恢复兼容性：存在 '+$conflicts+' 项依赖冲突'}else{''}
-      $View.compatWarningBody.Text=if($View.compatWarning.Visible){'ZIP 完整性已通过；恢复计划会重新检查依赖、宿主与数据 schema，未解决的关键问题会阻断提交。'}else{''}
-      $View.resultNote.Text=if($phase -eq 'success' -and $conflicts -gt 0){'文件校验通过不等于恢复业务通过；不会自动重启 DSH。'}elseif($phase -eq 'success'){'未记录依赖冲突；恢复时仍会重新检查依赖、宿主与数据 schema。文件校验通过不等于恢复业务通过；不会自动重启 DSH。'}elseif($phase -eq 'failed'){'请使用新的 ZIP 名称重新备份。'+$(if($State.error){' 错误码：'+$State.error}else{''})}elseif($phase -eq 'cancelled'){'如仍需备份，请重新发起。'}else{'请在 Packer 的“任务与恢复”中查看记录；未确认的 ZIP 不得当作成功备份。'}
+      $View.compatWarning.Visible=$phase -eq 'success' -and ($conflicts -gt 0 -or $covBlocked)
+      if($covBlocked){
+        $View.compatWarningTitle.Text='恢复受阻：'+$covCount+' 项关键覆盖缺口'+$(if($conflicts -gt 0){' · 另有 '+$conflicts+' 项依赖冲突'}else{''})
+        $View.compatWarningBody.Text='已知关键数据未采集（'+$(if($covLabel){$covLabel}else{'未列明代码'})+'）；ZIP 完整性仍通过，本包作为数据保全产物保留。当前受支持恢复流程被阻断；源环境可用时请另建新备份，不要修改原 ZIP。'
+      }elseif($View.compatWarning.Visible){
+        $View.compatWarningTitle.Text='恢复兼容性：存在 '+$conflicts+' 项依赖冲突'
+        $View.compatWarningBody.Text='ZIP 完整性已通过；恢复计划会重新检查依赖、宿主与数据 schema，未解决的关键问题会阻断提交。'
+      }else{$View.compatWarningTitle.Text='';$View.compatWarningBody.Text=''}
+      $View.resultNote.Text=if($phase -eq 'success'){
+        if($covBlocked){'已知关键覆盖缺口会阻断受支持恢复流程；本包仅作数据保全，不能据此认定可恢复。源环境可用时请另建新备份。不会自动重启 DSH。'}
+        else{
+          $base=if($conflicts -gt 0){'文件校验通过不等于恢复业务通过；不会自动重启 DSH。'}else{'未记录依赖冲突；恢复时仍会重新检查依赖、宿主与数据 schema。文件校验通过不等于恢复业务通过；不会自动重启 DSH。'}
+          $base+$(if($covState -eq 'unknown'){' 本次记录未含覆盖摘要，不能据此判断恢复可用性。'}else{' 本次未记录关键覆盖缺口；恢复仍须目标宿主检查。'})
+        }
+      }elseif($phase -eq 'failed'){'请使用新的 ZIP 名称重新备份。'+$(if($State.error){' 错误码：'+$State.error}else{''})}elseif($phase -eq 'cancelled'){'如仍需备份，请重新发起。'}else{'请在 Packer 的“任务与恢复”中查看记录；未确认的 ZIP 不得当作成功备份。'}
     }
     $View.title.AccessibleName=$View.title.Text;$View.subtitle.AccessibleName=$View.subtitle.Text
     $View.count.AccessibleName=$View.count.Text+'，'+$View.unit.Text;$View.instructions.AccessibleName=$View.instructions.Text

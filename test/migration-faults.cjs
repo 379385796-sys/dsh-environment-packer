@@ -28,10 +28,12 @@ const write=(p,b)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileS
    const who=cp.spawnSync('whoami.exe',['/user','/fo','csv','/nh'],{encoding:'utf8',windowsHide:true}),sid=who.stdout.match(/S-1-5-\d+(?:-\d+)+/)[0];const deny=cp.spawnSync('icacls.exe',[parent,'/deny','*'+sid+':(WD,AD)'],{encoding:'utf8',windowsHide:true});assert.equal(deny.status,0,deny.stderr);
    try{await assert.rejects(()=>E.apply(p,{confirmPrivate:true,confirmExecution:true}));assert(!fs.existsSync(p.layout.workspace));}finally{const restore=cp.spawnSync('icacls.exe',[parent,'/remove:d','*'+sid],{windowsHide:true});assert.equal(restore.status,0);}assert.equal(fs.readFileSync(path.join(parent,'sentinel.txt'),'utf8'),'KEEP');
  });
- await check('unknown critical database can be inspected and staged but cannot verify or commit',async()=>{
+ await check('known-unresolvable critical issue is refused before any staging write',async()=>{
    write(path.join(home,'memory/unknown.db'),'SYNTHETIC_UNKNOWN_FORMAT');const target=path.join(dir,'unknown.zip');await R.createBackup({...options,target});
-   const p=await E.plan({zipFile:target,installation:'D:/DeepSeek Harness',workspace:path.join(dir,'unknown-workspace')});assert(p.canApply);assert(p.issues.some(i=>i.code==='DATABASE_SCHEMA_UNKNOWN'&&i.critical));
-   await E.apply(p,{confirmPrivate:true,confirmExecution:true});await assert.rejects(()=>E.verify(p),e=>e.code==='CRITICAL_DATA_UNVERIFIED');await assert.rejects(()=>E.commit(p),e=>e.code==='CRITICAL_DATA_UNVERIFIED');assert(!fs.existsSync(path.join(p.layout.state,'Start-Restored-DSH.ps1')));assert.equal((await E.rollback(p)).status,'rolled-back');
+   const p=await E.plan({zipFile:target,installation:'D:/DeepSeek Harness',workspace:path.join(dir,'unknown-workspace')});assert.equal(p.canApply,false);assert(p.issues.some(i=>i.code==='DATABASE_SCHEMA_UNKNOWN'&&i.critical));
+   await assert.rejects(()=>E.apply(p,{confirmPrivate:true,confirmExecution:true}),e=>['MIGRATION_PLAN_BLOCKED','CRITICAL_DATA_UNVERIFIED'].includes(e.code));
+   assert(!fs.existsSync(p.layout.state));assert(!fs.existsSync(p.layout.workspace));
+   await assert.rejects(()=>E.verify(p));await assert.rejects(()=>E.commit(p));assert(!fs.existsSync(path.join(p.layout.state,'Start-Restored-DSH.ps1')));
  });
  const report={status:'PASS',dir,checks:results.length,results,noRealEnvironmentUsed:true};fs.writeFileSync(path.join(base,'migration-faults-result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 })().catch(e=>{console.error(e);process.exitCode=1;});

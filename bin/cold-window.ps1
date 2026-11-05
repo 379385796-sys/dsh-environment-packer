@@ -13,6 +13,19 @@ function Write-NewTaskRecord([string]$Name,[string]$Json) {
   [IO.File]::WriteAllText($temporary,$Json,[Text.Encoding]::UTF8)
   [IO.File]::Move($temporary,$destination)
 }
+# Bounded projection: stable codes and a count only. Old or malformed records
+# stay 'unknown'; they are never reported as a clean, complete capture.
+function Get-BoundedCoverage($Value) {
+  $unknown=@{schema=1;state='unknown';criticalCount=0;criticalCodes=@();truncated=$false;recoveryBlocked=$null;blockReason=$null}
+  if($null -eq $Value -or $Value.schema -ne 1){return $unknown}
+  $state=[string]$Value.state
+  if($state -notin @('critical-gaps','no-known-critical-gaps')){return $unknown}
+  $count=0;try{$count=[int]$Value.criticalCount}catch{$count=0};if($count -lt 0){$count=0}
+  $codes=@()
+  if($null -ne $Value.criticalCodes){$codes=@($Value.criticalCodes|Where-Object{$_ -match '^[A-Z0-9_]{1,64}$'}|Select-Object -Unique -First 8)}
+  $blocked=($state -eq 'critical-gaps')
+  return @{schema=1;state=$state;criticalCount=$count;criticalCodes=$codes;truncated=($Value.truncated -eq $true);recoveryBlocked=$blocked;blockReason=$(if($blocked){'CRITICAL_COVERAGE_GAPS'}else{$null})}
+}
 function Complete-AssistantView([string]$Outcome,[int]$Delay,[string]$Code) {
   # A terminal-looking status is not enough: the owning coordinator must have
   # completed its finally block, including worker shutdown and lock retirement.
@@ -29,7 +42,9 @@ function Complete-AssistantView([string]$Outcome,[int]$Delay,[string]$Code) {
   $state=$script:lastStatus
   $zipPresent=$false; try { $zipPresent=Test-Path -LiteralPath $job.target } catch {}
   $completedAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-  $record=@{id=$job.id;outcome=$Outcome;code=$Code;result=if($Outcome -eq 'success'){'files-verified'}else{'unconfirmed'};phase=if($state){[string]$state.phase}else{'unknown'};target=$job.target;bytes=if($state -and $null -ne $state.bytes){[long]$state.bytes}else{$null};sha256=if($state -and $state.sha256){[string]$state.sha256}else{$null};files=if($state -and $null -ne $state.files){[long]$state.files}else{$null};verified=($state -and $state.verified -eq $true);cleanup=($state -and $state.cleanup -eq $true);dependencyIssues=if($state -and $null -ne $state.dependencyIssues){[int]$state.dependencyIssues}else{0};integrity=if($Outcome -eq 'success'){'zip-crc-manifest-payload-verified'}else{'unconfirmed'};zipPresent=$zipPresent;completedAt=$completedAt;workerExited=$true;workerExitCode=$script:worker.ExitCode;sourceLeasesReleased=$true;at=$completedAt}
+  $rawCoverage=$null;if($state){$rawCoverage=$state.coverage}
+  $coverage=Get-BoundedCoverage $rawCoverage
+  $record=@{id=$job.id;outcome=$Outcome;code=$Code;result=if($Outcome -eq 'success'){'files-verified'}else{'unconfirmed'};phase=if($state){[string]$state.phase}else{'unknown'};target=$job.target;bytes=if($state -and $null -ne $state.bytes){[long]$state.bytes}else{$null};sha256=if($state -and $state.sha256){[string]$state.sha256}else{$null};files=if($state -and $null -ne $state.files){[long]$state.files}else{$null};verified=($state -and $state.verified -eq $true);cleanup=($state -and $state.cleanup -eq $true);dependencyIssues=if($state -and $null -ne $state.dependencyIssues){[int]$state.dependencyIssues}else{0};coverage=$coverage;integrity=if($Outcome -eq 'success'){'zip-crc-manifest-payload-verified'}else{'unconfirmed'};zipPresent=$zipPresent;completedAt=$completedAt;workerExited=$true;workerExitCode=$script:worker.ExitCode;sourceLeasesReleased=$true;at=$completedAt}
   $durable=$false
   try { Write-NewTaskRecord 'ui-result.json' ($record|ConvertTo-Json -Compress);$durable=$true } catch {}
   $script:finished=$true;$confirmExit.Enabled=$false;$cancel.Enabled=$true;$cancel.Text='关闭窗口'
@@ -42,8 +57,10 @@ function Complete-AssistantView([string]$Outcome,[int]$Delay,[string]$Code) {
     Update-PackerAssistantState $view @{phase='cancelled';files=$state.files;error=$Code;target=$job.target;at=$completedAt;zipPresent=$zipPresent}
     $view.title.Text='任务已取消';$view.subtitle.Text='写入与收尾已经结束；未生成有效 ZIP。'
   }
-  if($Outcome -eq 'unknown' -and -not $durable){$view.hint.Text='诊断写入失败，请保留此窗口并检查原始任务记录。';return}
-  $view.hint.Text=if($Outcome -eq 'success'){'结果已保留，请确认后关闭。不会自动重启 DSH。'}elseif($Outcome -eq 'cancelled'){'结果已保留；如仍需备份，请重新发起。'}else{'结果已保留，请确认后关闭；诊断可在下次启动 DSH 后查看。'}
+  # D-09: every terminal outcome must report record persistence truthfully.
+  if($durable){
+    $view.hint.Text=if($Outcome -eq 'success'){'结果已保留，请确认后关闭。不会自动重启 DSH。'}elseif($Outcome -eq 'cancelled'){'结果已保留；如仍需备份，请重新发起。'}else{'结果已保留，请确认后关闭；诊断可在下次启动 DSH 后查看。'}
+  }else{Set-PackerRecordDurability $view $false}
   & $view.Layout
   # The final page stays until the user closes it. No auto-close timer is armed.
   try { $timer.Stop() } catch {}

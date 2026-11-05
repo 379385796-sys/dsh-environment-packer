@@ -1,4 +1,6 @@
-# Build and test 0.5.0
+# Build and test
+
+> **Current release: v0.6.2.** The `0.5.0` heading below is the historical build record for that release; the same isolated-workspace rules apply. Current entry points, capacity limits and v0.6.2 targeted tests are in the last section. Historical artefact hashes are deliberately kept unchanged.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 
@@ -44,3 +46,28 @@ Baseline is the published v0.6.0 tree. The four targeted fixes are covered by:
 - `test/migration-smoke.cjs` and the existing recovery/2+3 focused entries — old strict-restore behavior remains unchanged.
 
 Build the release with `npm pack --ignore-scripts --json` into a separate candidate directory, then assemble the standalone toolkit from the package plus `Open-Recovery.ps1`, `READ-FIRST.txt` and `TOOLKIT-FILES.sha256`. Record exact SHA-256 values in the release assets. The accepted artifact was installed into the formal profile and a formal recovery/4 backup was generated with the known rewind/schemastery conflict recorded; no restore was executed.
+
+## v0.6.2 build, limits and targeted tests
+
+**Capacity limits (current implementation, `assets/recovery-core.cjs` / `assets/migration-plan.cjs`)**：
+
+| Limit | Value | Behaviour |
+|---|---|---|
+| `MAX_FILE` | 128 MiB per file | `SOURCE_TYPE_OR_SIZE` / `ARCHIVE_LIMIT` before publish |
+| `MAX_TOTAL` | 2 GiB total payload | `ARCHIVE_LIMIT` before publish |
+| `MAX_ENTRIES` | 60,000 files + directories | `ARCHIVE_LIMIT` before publish; keep headroom for `manifest.json` and directories |
+| Restore space budget | `payloadBytes × 3 + 128 MiB` | `INSUFFICIENT_SPACE` precheck; a **budget**, not actual staged residue |
+
+Limits fail explicitly; no silent trimming. `C.ZipWriter` writes stored (uncompressed) entries with strict name/CRC/central-directory checks; ZIP64, compressed and otherwise unsupported layouts are refused.
+
+**New targeted tests**（全部在 `DSH_PACKER_TEST_ROOT` 隔离合成目录；进程级 TEMP/TMP 与缓存也指向工作区）：
+
+- `test/v062-coverage-chain.cjs` — 偏好缺字段/合法值/未安装 comfort/非法字段闭环；真实 /4 ZIP 与有界摘要；改写清单不能伪造干净采集；五类结果层语义；`normalizeCoverage` 限长与脱敏；`migration-cli.cjs inspect` 规范 /4 检查与损坏归档拒绝。
+- `test/v062-apply-gate.cjs` — 合成宿主证据下 critical unknown 使 `canApply=false`，`apply` 在写入 state/workspace 前拒绝；干净载荷仍 `canApply=true`。
+- `test/v062-clean-path.cjs` — 干净载荷完整 `apply → verify`（两轮真实隔离运行时）`→ commit`，不执行回滚。
+- 扩展 `test/result-state-test.ps1`、`test/client-bundle-test.mjs`、`test/ui-overview-test.mjs`：四种终态的持久化失败提示、「归档完成；恢复受阻」、旧记录 unknown、非法采集提示。
+- 既有定向回归：`migration-dependency-gate.cjs`、`legacy-strict-restore.cjs`、`migration-smoke.cjs`、`cold-view-test.ps1`、`appearance-controls-test.ps1`、`final-layout-test.ps1`、`cold-paint-log-test.ps1`、`run-tests.mjs`、`route-export-test.mjs`、`recovery-route-test.mjs`、`tgz-test.mjs`。
+
+`run-regressions.mjs` 的 manifest 已登记三个新的 `.cjs` 入口。**不重跑整库**；本版不扩展运行时认证。`private-acceptance-test.mjs`（及 `pack-test.mjs`、`restore-view-test.ps1`）在 Node 22.22.2 下崩溃、基线同样复现，属既有环境限制；`migration-smoke.cjs` 的回滚在有运行中正式 DSH 写入者时按设计门禁阻止。真实 DPI、屏幕阅读器与跨设备业务认证继续显式待证。
+
+**发布产物冻结**：候选 TGZ 与独立工具 ZIP 的 `package/` 内容必须与最终 tag 中应一致文件逐字节相同；允许的生成文件（`Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`、`SHA256SUMS.txt` 与 `.sha256`）另附清单。README、下载链接、版本号与「归档完成；恢复受阻」说明不得落后于代码。冻结一次候选并记录哈希后再发布，不在已发布版本名下替换附件。

@@ -1,5 +1,7 @@
 # Host peer dependency contract (0.4.3)
 
+> **Historical / strict-channel document.** This describes the `dsh-private-recovery/2` and `/3` host-peer contract introduced in 0.4.3; it still applies to the strict channel unchanged. Current recovery/4 backups use the independent dependency re-evaluation described in [MIGRATION.md](MIGRATION.md). Current limits and independent /4 inspection: [BUILD-TEST.md](BUILD-TEST.md), [RESTORE.md](RESTORE.md).
+
 Version 0.4.3 is published. The checks below describe the implemented contract; they do not certify every Profile or arbitrary plugin graph. See the [current compatibility scope](COMPATIBILITY.md).
 
 The payload still contains installed Profile dependencies. An absent ordinary dependency is an error. Only a pure peer can be supplied by the Desktop installation; a dependency which is also declared as an ordinary dependency cannot use this exception. Installed peers take precedence and must satisfy their ranges. Missing optional peers are recorded; a present incompatible peer fails. Invalid metadata and non-semver peer ranges fail closed.

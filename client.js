@@ -31,7 +31,8 @@ window.__ModuleLoader__.load({
       HOT_BACKUP_DISABLED:'运行中完整备份已停用，请使用离线备份。',
       HOST_BROWSER_PEER_UNPROVEN:'浏览器 peer 的版本、来源或运行时兼容性证据不足。recovery/4 会记录该冲突并允许归档；恢复计划会重新检查，未解决的关键问题不能提交。',
       PEER_VERSION_MISMATCH:'依赖版本不满足声明要求。recovery/4 会记录真实冲突并允许归档；恢复计划会重新检查，未解决的关键问题不能提交。',
-      TRANSITIVE_DEPENDENCY_MISSING:'传递依赖检查未通过。recovery/4 会保留真实冲突并允许归档；恢复计划会重新检查缺失项、版本及宿主来源，未解决的关键问题不能提交。'
+      TRANSITIVE_DEPENDENCY_MISSING:'传递依赖检查未通过。recovery/4 会保留真实冲突并允许归档；恢复计划会重新检查缺失项、版本及宿主来源，未解决的关键问题不能提交。',
+      CLIENT_PREFERENCE_INVALID:'客户端偏好采集数据格式不合法，未创建备份任务。请刷新设置页后重试；Packer 不会用默认值冒充已采集。'
     };
     const css = `
 .ep{font:inherit;color:var(--dsw-alias-label-primary,CanvasText);line-height:1.6;min-width:0;container:packer / inline-size;--ep-muted:var(--dsw-alias-label-secondary,GrayText);--ep-subtle:var(--dsw-alias-label-tertiary,GrayText);--ep-line:var(--dsw-alias-border-l2,ButtonBorder);--ep-layer:var(--dsw-alias-bg-layer-2,Canvas);--ep-accent:var(--dsw-alias-brand-primary,Highlight);--ep-warn:var(--dsw-alias-state-warn-primary,CanvasText);--ep-error:var(--dsw-alias-state-error-primary,CanvasText)}
@@ -80,13 +81,13 @@ window.__ModuleLoader__.load({
       const overview=defaults?.taskOverview;
       const fmtBytes=n=>typeof n!=='number'||!Number.isFinite(n)||n<0?'':n>=1073741824?(n/1073741824).toFixed(2)+' GB':n>=1048576?(n/1048576).toFixed(1)+' MB':n>=1024?(n/1024).toFixed(0)+' KB':n+' B';
       const fmtTime=ms=>{try{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;}catch{return '';}};
-      const phaseNames={waiting:'等待正常退出与人工确认','exit-verified':'退出检查通过',scanning:'扫描文件','checking-dependencies':'检查依赖',writing:'生成备份',verifying:'验证 ZIP',success:'备份成功（文件完整性通过；恢复业务未验证）',failed:'失败或已取消',unknown:'结果未确认'};
+      const phaseNames={waiting:'等待正常退出与人工确认','exit-verified':'退出检查通过',scanning:'扫描文件','checking-dependencies':'检查依赖',writing:'生成备份',verifying:'验证 ZIP',success:'归档完成（文件完整性通过；恢复状态见本次记录）',failed:'失败或已取消',unknown:'结果未确认'};
       const recorded=overview?.current?.diagnostic?overview.current:overview?.history?.find(t=>t.diagnostic);
       const diagnostic=recorded?.diagnostic;
       const tone=busy||/独立助手已接管任务/.test(message)?'running':/已安全恢复|已经安全退役|当前没有阻止/.test(message)?'success':/失败|损坏|未通过|拒绝|无法|未启动|证据不足/.test(message)?'error':message?'warning':'unknown';
       const stateLabel={running:'执行中',success:'检查完成',error:'需要处理',warning:'请确认',unknown:'尚未检查'}[tone];
       const navigate=(name,text)=>h('button',{type:'button',className:'ep-link',onClick:()=>setTab(name)},text,icon('chevron'));
-      const outcomeLabel=task=>{const o=task.result?.outcome;return o==='success'?'备份成功':o==='cancelled'?'已取消':o==='failed'?'备份失败':o==='unknown'?'结果未确认':task.record==='corrupt'?'状态记录损坏，结果未知':phaseNames[task.phase]||'结果未知';};
+      const outcomeLabel=task=>{const o=task.result?.outcome;if(o==='success')return task.result?.recoveryState==='blocked'?'归档完成；恢复受阻':task.result?.recoveryState==='unknown'?'归档完成（覆盖状态未记录）':'归档完成（完整性通过）';return o==='cancelled'?'已取消':o==='failed'?'备份失败':o==='unknown'?'结果未确认':task.record==='corrupt'?'状态记录损坏，结果未知':phaseNames[task.phase]||'结果未知';};
       const taskLine=task=>{const r=task.result||null,size=r?fmtBytes(r.bytes):'',when=r?.completedAt?fmtTime(r.completedAt):'';
         return h('div',{key:task.id,className:'ep-record'},h('strong',null,outcomeLabel(task)),
           h('p',{className:'ep-path'},r?.target||task.id),
@@ -94,6 +95,8 @@ window.__ModuleLoader__.load({
           r?.sha256?h('p',{className:'ep-path'},`SHA-256 ${r.sha256}`):null,
           r?.outcome==='success'?h('p',null,r.integrity==='verified'?'完整性：ZIP 结构、CRC、清单与全部载荷哈希通过':'完整性：未确认'):null,
           r?.outcome==='success'&&r.dependencyIssues>0?h('p',null,`依赖冲突 ${r.dependencyIssues} 项已记录；恢复时重新检查。`):null,
+          r?.outcome==='success'&&r.coverage?.state==='critical-gaps'?h('p',null,`已知关键覆盖缺口 ${r.coverage.criticalCount} 项：${(r.coverage.criticalCodes||[]).join('、')||'未列明代码'}。受支持恢复流程被阻断；本包仅作数据保全，源环境可用时请另建新备份，不要修改原 ZIP。`):null,
+          r?.outcome==='success'&&r.coverage?.state==='unknown'?h('p',null,'本次记录未含覆盖摘要，不能据此判断恢复可用性。'):null,
           task.error&&r?.outcome!=='success'?h('p',null,`错误码 ${task.error}`):null);};
       const snapshotText=overview?.state==='lock-present'?'有任务记录，需确认是否结束':overview?.state==='corrupt'?'任务锁信息损坏，需检查安全恢复':overview?.state==='no-lock'||overview?.state==='no-records'?'本次备份尚未开始':'任务状态未知，请检查或刷新记录';
       const compatibility=diagnostic?h('div',{className:'ep-notice',role:'note'},diagnostic.unavailable?'保留的依赖诊断不可读取':diagnostic.issueCount>0?`保留的检查记录有 ${diagnostic.issueCount} 项兼容性问题（已写入归档）`:'保留的依赖记录未发现问题',h('p',null,'recovery/4 会把实际冲突保留在归档元数据中；恢复计划会重新检查依赖、宿主与数据 schema，未解决的关键问题会阻断提交。'),navigate('help','查看实际记录')):null;
@@ -107,14 +110,14 @@ window.__ModuleLoader__.load({
       const help=h('div',null,h('h3',null,'帮助与诊断'),h('p',{className:'ep-sub'},'关键阻塞会直接显示；说明、范围和技术详情在这里按需查看。'),
         diagnostic?h('details',null,h('summary',null,diagnostic.unavailable?'保留的依赖诊断不可读取':`保留的依赖诊断：${diagnostic.issueCount} 项问题`),h('div',null,h('p',{className:'ep-path'},`记录任务：${recorded.id}`),h('p',null,'这是该次任务的诊断，不是当前兼容性证明。'),diagnostic.issues?.map((x,i)=>h('code',{key:i,className:'ep-path'},`${x.package||'未知插件'} → ${x.name||'未知依赖'} · 要求 ${x.range||'未提供'}${x.actual?` · 实际 ${x.actual}`:''} · ${x.code}`)),diagnostic.truncated?h('p',null,'仅展示前 100 项，完整诊断保留在任务目录。'):null)):h('p',{className:'ep-sub'},'没有可读取的依赖检查记录。实际备份时仍会执行完整依赖检查。'),
         h('details',null,h('summary',null,'如何完成一次备份'),h('div',null,'选择 ZIP 并确认私人备份 → 助手接管 → 保存工作并正常退出全部 DSH 实例（包括托盘）→ 回到助手人工确认。',h('p',null,'人工确认不能绕过相关进程、源文件读锁、一致性或 ZIP 验证；外部写入程序也须停止。'))),
-        h('details',null,h('summary',null,'备份范围与恢复限制'),h('div',null,'完整备份仅覆盖当前 Profile 及声明的 home 状态，不包括外部工作区、模型、外部数据库、系统凭据和 DSH 运行时。',h('p',null,'恢复只允许写入全新兼容环境。ZIP 文件校验通过，不等于恢复后的 DSH 业务运行已验证。'))),
+        h('details',null,h('summary',null,'备份范围与恢复限制'),h('div',null,'完整备份仅覆盖当前 Profile 及声明的 home 状态，不包括外部工作区、模型、外部数据库、系统凭据和 DSH 运行时。',h('p',null,'恢复只允许写入全新兼容环境。ZIP 文件校验通过，不等于恢复后的 DSH 业务运行已验证。'),h('p',null,'归档完成不等于可恢复：若记录显示「恢复受阻」，说明已知关键数据未采集，现有受支持恢复流程不能提交。请保留该包作数据保全，源环境可用时另建新备份。'),h('p',null,'recovery/4 独立只读检查请用完整工具包内的 assets/migration-cli.cjs inspect；旧 verify-private.cjs 仅适用于 recovery/2、/3。检查成功也不等于恢复可提交。'))),
         h('details',null,h('summary',null,'当前 Profile 位置'),h('div',{className:'ep-path'},defaults?.profileDirectory||'尚未取得当前 Profile，不能据此判断备份可用。')),
         h('details',null,h('summary',null,'故障记录与恢复说明'),h('div',null,'日志、残留 ZIP 和提交回执保留在原任务目录。检查后的拒绝原因会直接显示；不要手动删除锁，也不要把未确认的 ZIP 当作成功备份。')),
         h('details',{open:fallback||undefined},h('summary',null,'专家兼容接口与路径后备'),h('div',null,'安全配置导出仅保留兼容接口，不能恢复完整环境。',fallback?h('div',null,h('label',null,'原生窗口不可用时的完整 ZIP 路径：',h('input',{value:target,disabled:busy,onChange:e=>setTarget(e.target.value),placeholder:'D:\\Backups\\private.zip',spellCheck:false,autoComplete:'off'})),action('manual-target','使用此路径并继续确认',()=>go(true),busy||!target.trim())):null)),
         h('p',{className:'ep-bottom'},'界面继承 DSH 的主题与字号；独立助手外观在助手内调整。'));
       const tabNames=[['backup','备份'],['tasks','任务与恢复'],['help','帮助与诊断']];
       const onTabKey=(event,index)=>{let next;if(event.key==='ArrowRight')next=(index+1)%3;else if(event.key==='ArrowLeft')next=(index+2)%3;else if(event.key==='Home')next=0;else if(event.key==='End')next=2;else return;event.preventDefault();setTab(tabNames[next][0]);event.currentTarget.parentElement.children[next].focus();};
-      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},defaults?.version||'0.6.1')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
+      return h('section',{className:'ep','aria-label':'环境恢复包'},h('style',null,css),h('header',null,h('h2',null,'环境恢复包',h('span',{className:'ep-version'},defaults?.version||'0.6.2')),h('p',{className:'ep-sub'},'备份当前环境，在需要时从容恢复。')),
         h('div',{className:'ep-tabs',role:'tablist','aria-label':'环境恢复包功能'},tabNames.map(([name,label],i)=>h('button',{key:name,id:'ep-tab-'+name,type:'button',role:'tab','aria-selected':tab===name,'aria-controls':'ep-panel-'+name,tabIndex:tab===name?0:-1,onClick:()=>setTab(name),onKeyDown:event=>onTabKey(event,i)},label))),
         h('div',{className:'ep-status','data-tone':tone,role:'status','aria-live':'polite','aria-atomic':true,hidden:!message},h('strong',null,stateLabel),message),
         h('div',{role:'tabpanel',id:'ep-panel-'+tab,'aria-labelledby':'ep-tab-'+tab,tabIndex:0},tab==='backup'?backup:tab==='tasks'?tasks:help));

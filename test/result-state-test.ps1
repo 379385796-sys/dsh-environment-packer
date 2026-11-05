@@ -33,7 +33,8 @@ try{
   $v.theme.SelectedIndex=1;&$v.ApplyTheme
 
   Update-PackerAssistantState $v @{phase='success';files=21064;bytes=50960793;sha256=('a'*64);target=$target;at=1793853731000;dependencyIssues=1;verified=$true;cleanup=$true}
-  if($v.title.Text -ne '备份成功' -or -not $v.resultCard.Visible -or $v.saveCard.Visible){throw 'SUCCESS_PAGE_INVALID'}
+  if($v.title.Text -ne '归档完成（覆盖状态未记录）' -or -not $v.resultCard.Visible -or $v.saveCard.Visible){throw 'SUCCESS_PAGE_INVALID'}
+  if($v.resultTitle.Text -ne '归档完成（覆盖状态未记录）' -or $v.resultNote.Text -notmatch '本次记录未含覆盖摘要'){throw 'OLD_RECORD_COVERAGE_UNKNOWN_MISSING'}
   if($v.resultPath.Text -ne $target -or $v.resultHash.Text -ne ('a'*64) -or $v.resultIntegrity.Text -notmatch 'ZIP 完整性.*通过' -or $v.resultTime.Text -notmatch '完成时间'){throw 'SUCCESS_DETAILS_MISSING'}
   if(-not $v.compatWarning.Visible -or $v.compatWarningTitle.Text -notmatch '1 项依赖冲突' -or $v.compatWarningBody.Text -notmatch 'ZIP 完整性已通过'){throw 'SUCCESS_COMPAT_WARNING_MISSING'}
   if($v.resultNote.Text -match '依赖冲突'){throw 'CONFLICT_NOTE_NOT_SEPARATED'}
@@ -47,6 +48,30 @@ try{
   Update-PackerAssistantState $v @{phase='success';files=21064;bytes=50960793;sha256=('a'*64);target=$target;at=1793853731000;dependencyIssues=0;verified=$true;cleanup=$true}
   if($v.compatWarning.Visible -or $v.resultNote.Text -notmatch '未记录依赖冲突'){throw 'CLEAN_SUCCESS_WARNING_INVALID'}
   $checks.Add('clean success hides the compatibility warning and states that no dependency conflict was recorded')
+
+  $covGap=@{schema=1;state='critical-gaps';criticalCount=1;criticalCodes=@('CLIENT_PREFERENCE_NOT_CAPTURED');truncated=$false;recoveryBlocked=$true;blockReason='CRITICAL_COVERAGE_GAPS'}
+  $covClean=@{schema=1;state='no-known-critical-gaps';criticalCount=0;criticalCodes=@();truncated=$false;recoveryBlocked=$false;blockReason=$null}
+  Update-PackerAssistantState $v @{phase='success';files=21064;bytes=50960793;sha256=('a'*64);target=$target;at=1793853731000;dependencyIssues=1;verified=$true;cleanup=$true;coverage=$covGap}
+  if($v.title.Text -ne '归档完成；恢复受阻' -or $v.resultTitle.Text -ne '归档完成；恢复受阻'){throw 'BLOCKED_SUCCESS_TITLE_INVALID'}
+  if($v.resultCaption.Text -ne 'ZIP 完整性通过' -or $v.resultIntegrity.Text -notmatch '通过'){throw 'BLOCKED_SUCCESS_INTEGRITY_NOT_SEPARATE'}
+  if(-not $v.compatWarning.Visible -or $v.compatWarningTitle.Text -notmatch '恢复受阻' -or $v.compatWarningTitle.Text -notmatch '1 项关键覆盖缺口'){throw 'BLOCKED_SUCCESS_WARNING_INVALID'}
+  if($v.compatWarningBody.Text -notmatch 'CLIENT_PREFERENCE_NOT_CAPTURED' -or $v.compatWarningBody.Text -notmatch '数据保全'){throw 'BLOCKED_SUCCESS_CODES_MISSING'}
+  if($v.resultNote.Text -notmatch '阻断' -or $v.resultNote.Text -notmatch '另建新备份'){throw 'BLOCKED_SUCCESS_NOTE_INVALID'}
+  $checks.Add('known critical gaps show 归档完成；恢复受阻 with stable codes while ZIP integrity stays separate')
+
+  Update-PackerAssistantState $v @{phase='success';files=21064;bytes=50960793;sha256=('a'*64);target=$target;at=1793853731000;dependencyIssues=0;verified=$true;cleanup=$true;coverage=$covClean}
+  if($v.title.Text -ne '归档完成' -or $v.compatWarning.Visible -or $v.resultNote.Text -notmatch '本次未记录关键覆盖缺口'){throw 'CLEAN_COVERAGE_INVALID'}
+  if($v.resultNote.Text -match '恢复已通过' -or $v.resultNote.Text -match '兼容成功'){throw 'CLEAN_COVERAGE_CLAIMS_COMPAT_SUCCESS'}
+  $checks.Add('a clean coverage summary never claims recovery compatibility success without a target check')
+
+  foreach($terminalPhase in @('success','failed','cancelled','unknown')){
+    Update-PackerAssistantState $v @{phase=$terminalPhase;files=0;error='ASSISTANT_COORDINATOR_EXITED';target=$target;at=1793853731000;zipPresent=$false;coverage=$covClean}
+    Set-PackerRecordDurability $v $false
+    if(-not $v.hint.Visible -or $v.hint.Text -match '结果已保留' -or $v.resultNote.Text -notmatch '结果记录未持久保存'){throw ('DURABLE_FAILURE_NOT_SHOWN_'+$terminalPhase)}
+    if($v.resultIntegrity.Text -notmatch 'ZIP|有效 ZIP'){throw ('ZIP_INTEGRITY_NOT_SEPARATE_'+$terminalPhase)}
+  }
+  $before=$v.resultNote.Text;Set-PackerRecordDurability $v $true;if($v.resultNote.Text -ne $before){throw 'DURABLE_TRUE_CHANGED_RESULT'}
+  $checks.Add('ui-result write failure is reported for all four terminal outcomes; ZIP integrity stays a separate fact')
 
   Update-PackerAssistantState $v @{phase='failed';files=0;error='PEER_VERSION_MISMATCH';failurePhase='checking-dependencies';target=$target;at=1793853731000;zipPresent=$false}
   if($v.title.Text -ne '备份失败' -or $v.resultTitle.Text -ne '备份失败' -or $v.resultIntegrity.Text -notmatch '未生成' -or $v.resultNote.Text -notmatch '重新备份' -or $v.compatWarning.Visible){throw 'FAILURE_PAGE_INVALID'}

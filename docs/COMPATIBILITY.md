@@ -1,6 +1,12 @@
 # Compatibility and acceptance boundary
 
-## Current 0.5.0 acceptance — 2026-11-02
+> **Current release: v0.6.2.** The current cold-backup format is `dsh-private-recovery/4`. Sections below labelled with a version/date are **historical acceptance records** for that release and are retained for provenance; they are not the current feature statement. Current behaviour, entry points and limits: [README.md](../README.md), [MIGRATION.md](MIGRATION.md), [RESTORE.md](RESTORE.md), [RELEASE-0.6.2.md](RELEASE-0.6.2.md).
+>
+> v0.6.2 does not extend the certified matrix: real 17-plugin combinations, native Mnemon business recovery on rc.1, real private database/credential recovery, cross-device migration, real 150% DPI and screen-reader speech remain uncertified. Known critical coverage gaps now surface as "归档完成；恢复受阻" and block the supported complete recovery flow. The strict recovery/2 and /3 channel keeps its exact runtime and host-proof rules.
+>
+> **Archive limits**: 128 MiB per file, 2 GiB total payload, 60,000 entries (including manifest/directory headroom); recovery free-space budget `payloadBytes × 3 + 128 MiB`. See [BUILD-TEST.md](BUILD-TEST.md) and [CLEANUP.md](CLEANUP.md).
+
+## Historical 0.5.0 acceptance — 2026-11-02
 
 Target: Windows 11 x64 / DSH Desktop 0.2.1-rc.5, Electron Node 24.21.0 / ABI 149; Windows .NET Framework WPF and the installed PowerShell engine. The small x64 managed GUI host runs as the current user, opens no console and changes no user/machine execution policy. No runtime or Windows DLL is bundled.
 

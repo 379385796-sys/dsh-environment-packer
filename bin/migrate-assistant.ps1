@@ -14,7 +14,9 @@ function Update-MigrationGate {
   $view.stepResult.IsEnabled=-not $script:busy -and $view.HasAttempted
   $view.form.FindName('StrictRestore').IsEnabled=-not $script:busy
   $view.restore.IsEnabled=-not $script:busy -and $valid -and $view.confirm.IsChecked -eq $true
-  $view.gateReason.Text=if($script:busy){'正在执行，请等待后台安全收尾。'}elseif(-not $filled){'选择 ZIP、DSH 安装目录及新 Workspace 根目录。'}elseif($null -eq $script:plan){'点击检查并生成计划；关键异常不会自动提交。'}elseif($valid){'计划可以在隔离目录执行。关键未知项仍会阻止完整提交。'}else{'计划包含不兼容依赖。可以查看报告，不能执行恢复。'}
+  $blockingCodes=@()
+  if($null -ne $script:plan){$blockingCodes=@($script:plan.issues|Where-Object{$_.critical -ne $false -and $_.code -match '^[A-Z0-9_]{1,64}$'}|ForEach-Object{$_.code}|Select-Object -Unique)}
+  $view.gateReason.Text=if($script:busy){'正在执行，请等待后台安全收尾。'}elseif(-not $filled){'选择 ZIP、DSH 安装目录及新 Workspace 根目录。'}elseif($null -eq $script:plan){'点击检查并生成计划；关键异常不会自动提交。'}elseif($valid){'计划可以在隔离目录执行；提交前仍会重新核验依赖、宿主、数据与启动。'}elseif($blockingCodes.Count -gt 0){'计划含已知关键阻断项（依赖或关键数据），不能执行恢复：'+($blockingCodes -join '、')}else{'计划包含不兼容项。可以查看报告，不能执行恢复。'}
 }
 function Invalidate-Migration {
   $script:plan=$null;$view.HasAttempted=$false;$view.confirm.IsChecked=$false;$view.PlanSummary.Text='等待生成计划';$view.PlanDetails.Text='';$view.Usability.Text='待启动验收';$view.result.Text='输入已改变，请重新检查。';Update-PackerRecoveryPresentation $view 'invalidated';Update-MigrationGate
@@ -81,9 +83,11 @@ $timer.Add_Tick({
     }elseif($script:operation -eq 'plan'){
       if($response.result.mode -ne 'migrate' -or $response.result.planSHA256 -cnotmatch '^[a-f0-9]{64}$' -or $response.result.archiveIntegrity.state -ne 'valid' -or $response.result.canApply -isnot [bool]){throw 'ASSISTANT_RESULT_INVALID'}
       $script:plan=$response.result
-      $view.Inspection=@{canRestore=$true};$view.integrity.Text='归档校验通过';$view.compatibility.Text=if($script:plan.canApply){'允许隔离验证'}else{'存在不兼容项'}
+      $view.Inspection=@{canRestore=$true};$view.integrity.Text='归档校验通过';$view.compatibility.Text=if($script:plan.canApply){'允许隔离验证'}else{'存在已知阻断项'}
       $view.backupInfo.Text='源格式：'+$script:plan.format+'；目标实际宿主：'+$script:plan.host.version
-      $view.result.Text=$script:plan|ConvertTo-Json -Depth 100;$view.coverage.Text='文件数：'+$script:plan.archiveIntegrity.files+[Environment]::NewLine+'路径映射：'+($script:plan.mappings|ConvertTo-Json -Depth 20)+[Environment]::NewLine+'待处理项目：'+($script:plan.issues|ConvertTo-Json -Depth 20)
+      $gapCodes=@($script:plan.issues|Where-Object{$_.critical -ne $false -and $_.code -match '^[A-Z0-9_]{1,64}$'}|ForEach-Object{$_.code}|Select-Object -Unique)
+      $gapText=if($gapCodes.Count -gt 0){$gapCodes -join '、'}else{'无'}
+      $view.result.Text=$script:plan|ConvertTo-Json -Depth 100;$view.coverage.Text='文件数：'+$script:plan.archiveIntegrity.files+[Environment]::NewLine+'关键阻断码：'+$gapText+[Environment]::NewLine+'路径映射：'+($script:plan.mappings|ConvertTo-Json -Depth 20)+[Environment]::NewLine+'待处理项目：'+($script:plan.issues|ConvertTo-Json -Depth 20)
       $view.PlanSummary.Text=('{0:N0} 个文件 · {1:N1} MB · {2} 个安装载荷'+[Environment]::NewLine+'{3} 个工作目录映射 · {4} 项待处理'+[Environment]::NewLine+'目标宿主：DSH {5}') -f $script:plan.archiveIntegrity.files,([double]$script:plan.archiveIntegrity.bytes/1MB),@($script:plan.plugins).Count,@($script:plan.mappings).Count,@($script:plan.issues).Count,$script:plan.host.version
       $view.PlanDetails.Text=$view.coverage.Text
       $view.targetFeedback.Text='Workspace：'+$script:plan.layout.workspace+[Environment]::NewLine+'自动 Home：'+$script:plan.layout.home

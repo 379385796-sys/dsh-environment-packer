@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2 — 2026-11-05（候选，未发布）
+
+- **Capture state / result closure**: `clientPreferences` is classified as `absent / present-valid / invalid` at the host boundary; `job.json` records only protocol version and state, never the raw body or preference values. Invalid input fails with `CLIENT_PREFERENCE_INVALID`; an absent field still allows a fully readable tree to be archived while keeping `CLIENT_PREFERENCE_NOT_CAPTURED` as a critical coverage gap. No default value is ever substituted to fake a successful capture.
+- Add a bounded, code-only `coverageSummary` (max 8 stable codes) to `manifest.coverage`, `onCommitted`, the worker `done` message, `terminal.json`, `ui-result.json` and `readUiOverview()`. `validate()` checks its shape and requires it to be derivable from `coverage.missing` / `coverage.excluded`, so a rewritten manifest cannot claim a clean capture. `completeWithinDeclaredScope` is now computed from `missing.length` instead of hardcoded; `sourceFilesVerified` keeps its original meaning.
+- Terminal and history views show 「归档完成；恢复受阻」 plus gap codes for known critical gaps, keep ZIP integrity separate, treat old records without a summary as unknown, and never claim recovery compatibility without a target check. Success integrity criteria are unchanged.
+- `migration-plan.cjs` exports `hasUnresolvedCritical`; `canApply`, the `apply` precheck, `verify` and `commit` share the same policy, so a recovery that cannot commit is refused before any state/workspace is written. The migration GUI lists critical blocking codes and no longer labels all blocked/unknown issues as dependency conflicts.
+- All four terminal outcomes now report `ui-result.json` write failures truthfully via `Set-PackerRecordDurability`; ZIP integrity and record durability are stated separately.
+- Document the canonical recovery/4 independent inspection entry (`assets/migration-cli.cjs inspect`), the strict /2 /3 vs /4 entry difference, archive capacity limits, and a minimal manual uninstall/cleanup procedure. Toolkit `READ-FIRST.txt` is frozen to v0.6.2.
+- No change to recovery/2 or /3 semantics, dependency/host/schema analysis, verify/commit gates, archive format, encryption or rollback behaviour. No archive repair interface and no automatic cleanup are added.
+
 ## 0.6.1 — 2026-11-05
 
 - recovery/4 cold backup no longer refuses a fully readable source tree solely because installed peers/engines conflict. The real issues are recorded in `manifest.compatibility` and the dependency report; malformed package metadata and unreadable sources still stop the archive. Restore re-evaluates the same contract, so unresolved critical issues still block apply/commit. recovery/2 and recovery/3 backup/restore gates are unchanged.

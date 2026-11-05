@@ -1,6 +1,6 @@
-# v0.6.2 — 最小可靠性修正（候选，未发布）
+# v0.6.2 — 最小可靠性修正
 
-基线：`v0.6.1`（tag `v0.6.1` / commit `2c9d20d`）。本版继续沿用 `dsh-private-recovery/4`，**不新增恢复格式、服务、框架、数据库或 UI 美术**。本文件随候选冻结；发布状态以实际 Release 为准。
+基线：`v0.6.1`（tag `v0.6.1` / commit `2c9d20d`）。本版继续沿用 `dsh-private-recovery/4`，**不新增恢复格式、服务、框架、数据库或 UI 美术**。发布状态以实际 Release 为准。
 
 依据：`Packer_v0.6.1_Codex_Audit_Verdict.md` 第 6、7 节。Hy4 原始独立审计报告仅作补充证据，凡与裁决冲突处以裁决为准。
 
@@ -65,4 +65,4 @@
 - `Packer-v0.6.2-Standalone-Recovery.zip` — 完整独立恢复工具（含 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`）。
 - `SHA256SUMS.txt` / 同名 `.sha256` — 精确校验值；本文件不内嵌自哈希。
 
-候选附件与最终 tag 的 package 文件逐字节一致，允许的生成文件另附清单。**本候选未安装、未推送 GitHub、未发布 Release、未更新 Market**；正式安装、发布与最终清理由下一阶段负责。
+构建与验收全部在隔离工作区完成，附件 `package/` 文件与 `v0.6.2` tag 逐字节一致，允许的生成文件另附清单。正式安装、GitHub 发布、DSH Market 更新与最终清理不在构建范围内，由后续阶段负责。

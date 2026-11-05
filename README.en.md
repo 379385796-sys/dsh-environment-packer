@@ -4,7 +4,7 @@ Private offline backup and guarded environment migration for DSH, with independe
 
 [Download v0.6.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) · [简体中文](README.md) · [Migration guide](docs/MIGRATION.md) · [Recovery preparation](docs/RECOVERY-PREPARATION.md) · [Cleanup](docs/CLEANUP.md)
 
-## 0.6.2 minimal reliability fixes (candidate)
+## 0.6.2 minimal reliability fixes
 
 - **Capture state and result closure**: client preference capture is classified as `absent / present-valid / invalid`. A bounded code-only coverage summary travels from the archive result through the worker terminal record, `ui-result.json`, Packer task history and the success page. A missing field still permits data preservation, but is never presented as a successful capture.
 - **"Archive complete; recovery blocked"**: with known critical gaps, the assistant and task records show that conclusion and the gap codes. ZIP integrity, recovery compatibility and post-restore usability remain separate. No target check means no compatibility success; old records without a summary stay unknown.

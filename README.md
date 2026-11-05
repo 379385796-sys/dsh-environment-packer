@@ -4,7 +4,7 @@
 
 [下载 v0.6.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
 
-## 0.6.2 最小可靠性修正（候选）
+## 0.6.2 最小可靠性修正
 
 - **采集状态与结果闭环**：客户端偏好字段的 `absent / present-valid / invalid` 状态被明确记录；关键覆盖缺口以有界、仅含稳定错误码的摘要从归档结果传到 worker 终态、`ui-result.json`、Packer 任务历史与成功页。字段缺失仍允许保全可读取的数据，但绝不显示为采集成功。
 - **「归档完成；恢复受阻」**：存在已知关键缺口时，成功页、任务记录明确显示该结论与缺口码；ZIP 完整性、恢复兼容性、恢复后业务可用性仍然分开表述。没有目标宿主检查时不宣称兼容成功；旧记录缺摘要按未知处理。

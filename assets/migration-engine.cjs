@@ -29,6 +29,8 @@ function destination(p,f){
 }
 function writeNew(file,bytes){C.noLinks(file);fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});const fd=fs.openSync(file,'wx',0o600);try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}if(C.sha(C.readStable(file))!==C.sha(bytes))C.fail('RESTORE_VERIFY_FAILED');}
 function memoryPath(p,file){
+  // Local source directory names are opaque user data, never memory IDs.
+  if((p.sourceTrees||[]).some(t=>A.inside(t.to,file)))return file;
   return file.replace(/([\\/]workspaces[\\/])([a-f0-9]{64})(?=[\\/])/g,(all,prefix,hash)=>{
     const r=p.mappings.find(r=>C.sha(Buffer.from(r.from))===hash);if(!r)C.fail('MEMORY_WORKSPACE_ID_UNKNOWN');return prefix+C.sha(Buffer.from(fs.realpathSync.native(r.to)));
   });

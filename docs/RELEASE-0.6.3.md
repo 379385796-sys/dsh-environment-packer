@@ -57,7 +57,7 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 
 | 项目 | 结果 |
 |---|---|
-| `test/v063-source-coverage.cjs` | PASS 22 项：源码树采集/排除 `node_modules`、显式分类、未知项保守告警、`.bak` 有无 live 的两种语义、clean 覆盖、确定性映射、暂存摘要、变更/缺失拒绝、清单计数与排除段篡改拒绝、源码树内预编译 `.node` 不触发原生门禁、旧归档兼容、`apply` 实际暂存与 `verify` 源码树门禁 |
+| `test/v063-source-coverage.cjs` | PASS 23 项：源码树采集/排除 `node_modules`、显式分类、未知项保守告警、`.bak` 有无 live 的两种语义、clean 覆盖、确定性映射、暂存摘要、变更/缺失拒绝、清单计数与排除段篡改拒绝、源码树内预编译 `.node` 不触发原生门禁、旧归档兼容、`apply` 实际暂存与 `verify` 源码树门禁 |
 | `test/migration-dependency-gate.cjs` | PASS：/4 记录真实 peer 冲突且包名精确无 `@//`；恢复重分析仍 blocked/critical；/2 /3 严格备份门禁不变；结构错误仍在写盘前失败 |
 | `test/v062-coverage-chain.cjs` | PASS 15 项：偏好采集状态、有界摘要、清单自洽、结果层语义、规范 inspect 与损坏拒绝（回归） |
 | `test/v062-apply-gate.cjs` | PASS 6 项：critical unknown 在创建 state/workspace 前拒绝，干净计划仍可 apply（回归） |
@@ -82,3 +82,7 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 最终产物与 tag 逐字节核对，保留候选与旧版附件。不执行生产恢复；已知 peer 冲突不降级。
 
 Codex 最终修正：sourceTrees 只允许 plugins-local，强制 node_modules 排除（大小写不敏感），拒绝运行时目录伪装为源码树；verify 两轮启动后再次核对惰性源码摘要。
+
+惰性源码路径完全保留：源码内部 workspaces/<64位哈希>/ 目录不进入记忆路径重写，完整真实运行时测试包含该反例。
+
+正式 ZIP 的只读恢复计划在独立 CLI 证据条件下还可能报告 HOST_BROWSER_PEER_UNPROVEN（浏览器 peer 的来源/realm 证据不足）；这与归档阶段记录的版本冲突数量不同。仍按 critical 阻断，不伪造浏览器证据，不执行正式恢复。

@@ -21,6 +21,7 @@ const write=(p,b)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileS
  write(path.join(source,'index.cjs'),"throw new Error('INERT_SOURCE_WAS_ACTIVATED');\n");
  write(path.join(source,'data/cache.db'),'inert binary fixture');
  write(path.join(source,'node_modules/ignored/index.js'),'excluded');
+ write(path.join(source,'workspaces','0'.repeat(64),'literal.txt'),'literal source path');
  const historyName='.dshw-usage.json.before-recharge-fix.bak';write(path.join(home,historyName),'historical fixture');
  // No comfort plugin is installed in this fixture, so an absent field is not a
  // gap. Explicit preference byte-accuracy is covered by v062-coverage-chain.cjs.
@@ -33,6 +34,7 @@ const write=(p,b)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileS
  assert.equal(fs.existsSync(path.join(plan.layout.home,historyName)),false);
  assert.equal(fs.readFileSync(path.join(plan.layout.state,'packages/home-history',historyName),'utf8'),'historical fixture');
  assert.equal(fs.existsSync(path.join(plan.layout.home,'plugins-local/inert-plugin/node_modules')),false);
+ assert.equal(fs.readFileSync(path.join(plan.layout.home,'plugins-local/inert-plugin/workspaces','0'.repeat(64),'literal.txt'),'utf8'),'literal source path');
  const treeBefore=E.sourceTreeDigest(plan);
  const verified=await E.verify(plan);assert.equal(verified.rounds.length,2);
  assert.deepEqual(E.sourceTreeDigest(plan),treeBefore);assert.deepEqual(verified.sourceTrees,treeBefore);

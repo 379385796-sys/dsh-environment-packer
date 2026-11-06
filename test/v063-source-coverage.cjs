@@ -125,6 +125,11 @@ function fixture(name,{unknown=false,liveCache=true,sources=true}={}){
   ok('source tree files have a deterministic Home-relative restore mapping',()=>{
     assert.equal(destination,path.join('C:\\Target\\Home','plugins-local/demo-plugin/lib/index.js'));
   });
+  ok('opaque source paths never enter memory workspace-ID rewriting',()=>{
+    const to=path.join(clean.dir,'new-home/plugins-local'),file=path.join(to,'demo/workspaces','0'.repeat(64),'keep.txt');
+    assert.equal(E.memoryPath({sourceTrees:[{to}],mappings:[]},file),file);
+    assert.throws(()=>E.memoryPath({sourceTrees:[],mappings:[]},file),e=>e.code==='MEMORY_WORKSPACE_ID_UNKNOWN');
+  });
   const staged=path.join(clean.dir,'staged'),restoredHome=path.join(staged,'home');
   write(path.join(restoredHome,'plugins-local/demo-plugin/package.json'),{name:'demo-plugin',version:'1.2.3'});
   write(path.join(restoredHome,'plugins-local/demo-plugin/lib/index.js'),'export default 1;\n');

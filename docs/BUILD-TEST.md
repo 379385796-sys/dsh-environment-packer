@@ -80,7 +80,7 @@ Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Gi
 
 **New targeted test**：
 
-- `test/v063-source-coverage.cjs` — 22 checks: `plugins-local` source capture with `node_modules` excluded; explicit `captured-local-plugin-source` classification; unrelated unknown Home entry still critical; `.bak` with and without its live file; clean coverage summary; deterministic Home-relative restore mapping; staged file/byte/digest; changed/missing staged tree refusal; manifest count tamper refusal; pre-0.6.3 archive without `sourceTrees` still readable; real `apply` staging and `verify` `SOURCE_TREE_CHANGED` gate (synthetic host evidence, no DSH start).
+- `test/v063-source-coverage.cjs` — 23 checks: `plugins-local` source capture with `node_modules` excluded; explicit `captured-local-plugin-source` classification; unrelated unknown Home entry still critical; `.bak` with and without its live file; clean coverage summary; deterministic Home-relative restore mapping; staged file/byte/digest; changed/missing staged tree refusal; manifest count tamper refusal; pre-0.6.3 archive without `sourceTrees` still readable; real `apply` staging and `verify` `SOURCE_TREE_CHANGED` gate (synthetic host evidence, no DSH start).
 
 **Extended targeted test**：
 

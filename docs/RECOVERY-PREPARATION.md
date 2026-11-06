@@ -19,7 +19,7 @@
 
 **全部文件哈希正确，不等于全部业务数据均已备份。仅持有 ZIP，也不保证未来在任意 DSH 版本或任意电脑上可以恢复。** 真正跨设备迁移必须另行实测，不能由同机文件验证推断。
 
-### v0.6.2：当前归档格式的独立检查
+### v0.6.3 / v0.6.2：当前归档格式的独立检查
 
 `dsh-private-recovery/4`（0.6.0 起的冷备）使用**完整工具包**内的现有入口，不需要运行中的 DSH 或 Agent，不解压、不创建恢复目录、不执行归档插件：
 
@@ -43,6 +43,6 @@ node <完整工具包>\assets\migration-cli.cjs inspect --request <私有目录>
 
 操作入口和准确命令见 [RESTORE.md](RESTORE.md)。组件测试与实际窗口、Desktop 启动验收分别记录；本轮同机合成环境的真实恢复与重启通过，不代表跨设备迁移或任意私人业务数据已经验收。
 
-## 当前工具包（v0.6.2）
+## 当前工具包（v0.6.3 候选；已发布 v0.6.2）
 
-从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载 `Packer-v0.6.2-Standalone-Recovery.zip` 与 `SHA256SUMS.txt`，校验后解开到独立、已存在的工具目录。保留完整 `package` 目录（含 `bin`、`assets`、`vendor`）以及 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`；不要只复制 EXE。备份 ZIP 不含 DSH 安装程序及未收录的外部资源。
+已发布版本仍从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载 `Packer-v0.6.2-Standalone-Recovery.zip` 与 `SHA256SUMS.txt`。v0.6.3 候选工具包在隔离工作区构建，见 [RELEASE-0.6.3.md](RELEASE-0.6.3.md)；未上传 Release。解开到独立、已存在的工具目录，保留完整 `package` 目录（含 `bin`、`assets`、`vendor`）以及 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`；不要只复制 EXE。备份 ZIP 不含 DSH 安装程序及未收录的外部资源。v0.6.3 起归档可能额外包含 `plugins-local` 本地插件源码（排除 `node_modules`），恢复时仅作为数据写入新 Home，不激活。

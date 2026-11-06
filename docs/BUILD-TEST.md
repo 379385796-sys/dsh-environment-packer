@@ -1,6 +1,6 @@
 # Build and test
 
-> **Current release: v0.6.2.** The `0.5.0` heading below is the historical build record for that release; the same isolated-workspace rules apply. Current entry points, capacity limits and v0.6.2 targeted tests are in the last section. Historical artefact hashes are deliberately kept unchanged.
+> **Current source: v0.6.3 candidate (published release: v0.6.2).** The `0.5.0` and v0.6.2 sections below are historical build records for those releases; the same isolated-workspace rules apply. The v0.6.3 section is at the end. Historical artefact hashes are deliberately kept unchanged.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 
@@ -71,3 +71,32 @@ Limits fail explicitly; no silent trimming. `C.ZipWriter` writes stored (uncompr
 `run-regressions.mjs` 的 manifest 已登记三个新的 `.cjs` 入口。**不重跑整库**；本版不扩展运行时认证。`private-acceptance-test.mjs`（及 `pack-test.mjs`、`restore-view-test.ps1`）在 Node 22.22.2 下崩溃、基线同样复现，属既有环境限制；`migration-smoke.cjs` 的回滚在有运行中正式 DSH 写入者时按设计门禁阻止。真实 DPI、屏幕阅读器与跨设备业务认证继续显式待证。
 
 **发布产物冻结**：候选 TGZ 与独立工具 ZIP 的 `package/` 内容必须与最终 tag 中应一致文件逐字节相同；允许的生成文件（`Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`、`SHA256SUMS.txt` 与 `.sha256`）另附清单。README、下载链接、版本号与「归档完成；恢复受阻」说明不得落后于代码。冻结一次候选并记录哈希后再发布，不在已发布版本名下替换附件。
+
+## v0.6.3 build, classification tests and limits
+
+Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Git worktree. Node used for these targeted runs: v22.22.2 (x64). The installed DSH Electron Node was not started this round.
+
+**Capacity limits are unchanged**: 128 MiB per file, 2 GiB total payload, 60,000 files + directories (`manifest.json` and directory headroom included), restore budget `payloadBytes × 3 + 128 MiB`. A per-tree entry/link/type failure becomes `LOCAL_SOURCE_TREE_INCOMPLETE`; whole-archive limits still fail explicitly, and no silent trimming occurs.
+
+**New targeted test**：
+
+- `test/v063-source-coverage.cjs` — 18 checks: `plugins-local` source capture with `node_modules` excluded; explicit `captured-local-plugin-source` classification; unrelated unknown Home entry still critical; `.bak` with and without its live file; clean coverage summary; deterministic Home-relative restore mapping; staged file/byte/digest; changed/missing staged tree refusal; manifest count tamper refusal; pre-0.6.3 archive without `sourceTrees` still readable; real `apply` staging and `verify` `SOURCE_TREE_CHANGED` gate (synthetic host evidence, no DSH start).
+
+**Extended targeted test**：
+
+- `test/migration-dependency-gate.cjs` — additionally asserts the recorded peer identity is exact (`dsh-rewind-plugin`, `@deepseek-ai/schemastery`, `^3.19.0`, `3.18.5`), contains no `@//` rewrite, and that restore re-analysis keeps the conflict `blocked/critical` (`hasUnresolvedCritical === true`).
+
+**Regression subset actually run**：
+
+| Entry | Result |
+|---|---|
+| `test/v063-source-coverage.cjs` | PASS 18 |
+| `test/migration-dependency-gate.cjs` | PASS |
+| `test/v062-coverage-chain.cjs` | PASS 15 |
+| `test/v062-apply-gate.cjs` | PASS 6 |
+| `test/client-bundle-test.mjs` | PASS |
+| `test/ui-overview-test.mjs` | PASS |
+
+All test roots, ZIPs and staged state were under `DSH_PACKER_TEST_ROOT`; no real Home, Profile, private ZIP, Mnemon store, credential or session body was read. `v062-clean-path.cjs` (two real isolated DSH runtime rounds) was **not** rerun this round and remains an explicit pre-release acceptance item; the source-tree change does not alter its dependency/host gate but adds staged data that must be exercised on the real runtime before release.
+
+**Candidate build**：`npm pack --ignore-scripts --json` into `candidate/v0.6.3/`, then assemble the standalone toolkit from the TGZ plus `Open-Recovery.ps1`, `READ-FIRST.txt` and `TOOLKIT-FILES.sha256`. `package/` content must match the candidate commit byte for byte; generated toolkit files are listed separately. Record SHA-256 values in `SHA256SUMS.txt`; do not embed the artifact's own hash inside itself. No formal install, GitHub Release, Market update, private ZIP overwrite or production restore is part of this build.

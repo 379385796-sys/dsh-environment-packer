@@ -30,12 +30,29 @@ function coverageSummary(missing,excluded){
   return {schema:1,state:count?'critical-gaps':'no-known-critical-gaps',criticalCount:count,criticalCodes:unique.slice(0,MAX_COVERAGE_CODES),truncated:unique.length>MAX_COVERAGE_CODES,recoveryBlocked:count>0,blockReason:count>0?'CRITICAL_COVERAGE_GAPS':null};
 }
 const OMIT_HOME=new Set(['profiles','cache','logs','telemetry','dsh-runtimes','.packer-cold','subagent-gc-backup','.anonymous-user-id','dsh-skills-manager.log','PACKER-CLIENT-PREFERENCES.json','PACKER-RESTORE-RESULT.json','PACKER-TOOL-PROVENANCE.json']);
+// `plugins-local` is a plain user source area, not a DSH runtime path: neither
+// the desktop application nor any installed plugin reads it. Its packages are
+// preserved as inert data so local edits are not lost, but their node_modules
+// trees are install artifacts, may contain junctions/native payloads and must
+// never become environment packages in the restore plan.
+const LOCAL_SOURCE_HOME='plugins-local';
+const LOCAL_SOURCE_EXCLUDED=new Set(['node_modules']);
+// A manual `.bak` of a Packer-known home cache is a superseded snapshot, not a
+// separate data set. Only classify it when the live, captured file still
+// exists; otherwise the backup may be the only copy and stays a critical gap.
+const CACHE_BACKUP=/^(\.dshw-(?:usage|size|turn)\.json)\..+\.bak$/i;
 const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','AGENTS.md','.credentials.yaml','.credentials.yml','settings.yaml','settings.yaml.imported','cordis.patch.yml','.env','dsh-claude-style','rewind-snapshots','skills-manager','llm-deepseek','archive-manager','aik_auto_memory_use','dsh-market','dsh-builtin-browser-host','models','emoji-packs','whale-audio','whale-bubble-imgs','whale-roles','.dshw-size.json','.dshw-turn.json','.dshw-usage.json']);
 async function legacy(){return import(pathToFileURL(path.join(__dirname,'../lib/private-backup.js')).href);}
 function fileRecord(source,relative){const s=fs.lstatSync(source);if(!s.isFile()||s.isSymbolicLink()||s.size>C.MAX_FILE)C.fail('SOURCE_TYPE_OR_SIZE');return {path:relative,source,identity:C.identity(s),bytes:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs};}
 function addTree(source,relative,files,dirs){
   C.noLinks(source);const s=fs.lstatSync(source);C.safeName(relative);
   if(s.isDirectory()){dirs.push(relative);for(const name of fs.readdirSync(source).sort())addTree(path.join(source,name),relative+'/'+name,files,dirs);}
+  else files.push(fileRecord(source,relative));
+  if(files.length+dirs.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
+}
+function addSourceTree(source,relative,files,dirs){
+  C.noLinks(source);const s=fs.lstatSync(source);C.safeName(relative);
+  if(s.isDirectory()){dirs.push(relative);for(const name of fs.readdirSync(source).sort()){if(LOCAL_SOURCE_EXCLUDED.has(name.toLowerCase()))continue;addSourceTree(path.join(source,name),relative+'/'+name,files,dirs);}}
   else files.push(fileRecord(source,relative));
   if(files.length+dirs.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
 }
@@ -63,7 +80,13 @@ async function discover({homeDir,profileDir,workspaceRoot,agentsDir,clientPrefer
   for(const r of roots.filter(r=>['memory','skills'].includes(r.kind)))if(!r.exists&&!r.defaultRoot)missing.push({code:'EXTERNAL_DATA_MISSING',root:r.id,critical:true});
   for(const name of fs.readdirSync(homeDir).sort())if(!USER_HOME.has(name)){
     const captured=roots.some(r=>['memory','skills'].includes(r.kind)&&A.canonical(r.path)===A.canonical(path.join(homeDir,name)));
-    excluded.push({name,reason:captured?'captured-as-data-root':OMIT_HOME.has(name)||name.startsWith('.deployment-rollback')?'runtime-cache-history-or-task':name==='plugins-local'?'unclassified-source-tree':'unclassified-home-entry',needsReview:!captured&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')});
+    const backupBase=CACHE_BACKUP.exec(name)?.[1],liveBase=backupBase?path.join(homeDir,backupBase):null,superseded=liveBase&&(()=>{try{return fs.lstatSync(liveBase).isFile();}catch{return false;}})()?backupBase:null;
+    const reason=captured?'captured-as-data-root'
+      :name===LOCAL_SOURCE_HOME?'captured-local-plugin-source'
+      :OMIT_HOME.has(name)||name.startsWith('.deployment-rollback')?'runtime-cache-history-or-task'
+      :superseded?'superseded-runtime-cache-backup'
+      :'unclassified-home-entry';
+    excluded.push({name,reason,...(superseded?{supersededBy:superseded}:{}),needsReview:!captured&&name!==LOCAL_SOURCE_HOME&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')&&!superseded});
   }
   const capture=classifyClientPreferences(clientPreferences),preferences=capture.preferences;
   // An absent field is a real, critical capture gap. Data preservation still
@@ -76,6 +99,23 @@ async function inventory(options){
   const files=old.files.map(f=>({...f,path:f.path.startsWith('profile/')?'profiles/desktop/'+f.path.slice(8):'home-data/'+f.path.slice(5)}));
   const directories=old.directories.map(n=>n.startsWith('profile/')?'profiles/desktop/'+n.slice(8):'home-data/'+n.slice(5));
   for(const name of [...USER_HOME].sort())if(!base.HOME_SCOPE.includes(name)&&fs.existsSync(path.join(options.homeDir,name)))addTree(path.join(options.homeDir,name),'home-data/'+name,files,directories);
+  // Local plugin sources are captured as inert data. A failure inside that tree
+  // is reported as a critical coverage gap instead of aborting the whole
+  // archive: readable environment data must still be preserved.
+  const sourceTrees=[],localSource=path.join(options.homeDir,LOCAL_SOURCE_HOME),localEntry=layout.excluded.find(i=>i.name===LOCAL_SOURCE_HOME);
+  if(localEntry&&!fs.existsSync(localSource)){localEntry.needsReview=true;layout.missing.push({code:'LOCAL_SOURCE_TREE_INCOMPLETE',tree:LOCAL_SOURCE_HOME,critical:true});}
+  else if(fs.existsSync(localSource)){
+    const treeFiles=[],treeDirs=[];
+    try{
+      addSourceTree(localSource,'home-data/'+LOCAL_SOURCE_HOME,treeFiles,treeDirs);
+      files.push(...treeFiles);directories.push(...treeDirs);
+      sourceTrees.push({name:LOCAL_SOURCE_HOME,archivePrefix:'home-data/'+LOCAL_SOURCE_HOME,restorePath:LOCAL_SOURCE_HOME,fileCount:treeFiles.length,bytes:treeFiles.reduce((n,f)=>n+f.bytes,0),excluded:[...LOCAL_SOURCE_EXCLUDED].sort(),complete:true});
+    }catch(e){
+      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','ARCHIVE_LIMIT','UNSAFE_ARCHIVE_PATH'].includes(e.code))throw e;
+      const entry=layout.excluded.find(i=>i.name===LOCAL_SOURCE_HOME);if(entry)entry.needsReview=true;
+      layout.missing.push({code:'LOCAL_SOURCE_TREE_INCOMPLETE',tree:LOCAL_SOURCE_HOME,critical:true});
+    }
+  }
   for(const r of layout.roots){
     if(!r.exists&&['memory','skills','agents','workspace'].includes(r.kind))continue;
     if(['memory','skills'].includes(r.kind)){
@@ -120,7 +160,7 @@ async function inventory(options){
   }
   const seen=new Set();for(const f of files){C.safeName(f.path);if(seen.has(f.path.toLowerCase()))C.fail('SOURCE_PATH_COLLISION');seen.add(f.path.toLowerCase());}
   const total=files.reduce((n,f)=>n+f.bytes,0);if(total>C.MAX_TOTAL-16*1024*1024||files.length+directories.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
-  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,legacyInventory:old};
+  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,legacyInventory:old};
 }
 function validate(zip){
   let m;try{m=JSON.parse(zip.get('manifest.json'));}catch{C.fail('INVALID_MANIFEST');}
@@ -144,6 +184,21 @@ function validate(zip){
   const all=new Map(),ids=new Set();for(const r of m.roots){if(typeof r.id!=='string'||!/^[a-z0-9-]+$/.test(r.id)||ids.has(r.id)||!['home','profile','workspace','memory','skills','agents'].includes(r.kind)||typeof r.path!=='string'||!path.win32.isAbsolute(r.path))C.fail('INVALID_MIGRATION_ROOT');ids.add(r.id);}
   for(const [list,type]of [[m.directories,'dir'],[m.files,'file']])for(const f of list){const n=type==='file'?f.path:f;C.safeName(n);if(!/^(profiles\/desktop\/|home-data\/|packages\/|preferences\/|workspaces\/)/.test(n)||all.has(n.toLowerCase()))C.fail('INVALID_MIGRATION_SCOPE');all.set(n.toLowerCase(),type);if(type==='file'&&(!/^[a-f0-9]{64}$/.test(f.sha256)||!Number.isSafeInteger(f.bytes)||f.bytes<0))C.fail('INVALID_MANIFEST');}
   for(const [n]of all){if(n.startsWith('workspaces/')&&!ids.has(n.split('/')[1]))C.fail('INVALID_MIGRATION_ROOT');const parts=n.split('/');parts.pop();while(parts.length){if(all.get(parts.join('/'))==='file')C.fail('ARCHIVE_PATH_COLLISION');parts.pop();}}
+  // Source trees are optional for backward compatibility with pre-0.6.3
+  // archives. When declared they must match the recorded files exactly, so a
+  // rewritten manifest cannot shrink or omit captured source data.
+  if(m.sourceTrees!==undefined){
+    if(!Array.isArray(m.sourceTrees)||m.sourceTrees.length>16)C.fail('INVALID_MIGRATION_MANIFEST');
+    const trees=new Set();
+    for(const t of m.sourceTrees){
+      if(!t||typeof t!=='object'||Array.isArray(t)||typeof t.name!=='string'||!/^[A-Za-z0-9._-]{1,64}$/.test(t.name)||t.name==='.'||t.name==='..'||trees.has(t.name)||t.archivePrefix!=='home-data/'+t.name||t.restorePath!==t.name||t.complete!==true||!Number.isSafeInteger(t.fileCount)||t.fileCount<0||!Number.isSafeInteger(t.bytes)||t.bytes<0||!Array.isArray(t.excluded)||t.excluded.length>8||t.excluded.some(x=>typeof x!=='string'||!/^[A-Za-z0-9._-]{1,32}$/.test(x)))C.fail('INVALID_MIGRATION_MANIFEST');
+      const prefix=t.archivePrefix+'/',under=m.files.filter(f=>f.path.startsWith(prefix));
+      if(under.length!==t.fileCount||under.reduce((n,f)=>n+f.bytes,0)!==t.bytes)C.fail('INVALID_MIGRATION_MANIFEST');
+      const excluded=new Set(t.excluded);
+      if(under.some(f=>f.path.slice(prefix.length).split('/').some(part=>excluded.has(part))))C.fail('INVALID_MIGRATION_MANIFEST');
+      trees.add(t.name);
+    }
+  }
   for(const p of m.packages)if(typeof p.name!=='string'||!require('./host-proof.cjs').validName(p.name)||typeof p.version!=='string')C.fail('INSTALLED_PACKAGE_INVALID');
   for(const tool of m.tools||[]){if(tool.name!=='mnemon'||tool.archivePath!=='packages/native-mnemon/mnemon.exe'||!m.files.some(f=>f.path===tool.archivePath&&f.sha256===tool.sha256)||tool.platform!=='win32'||tool.arch!=='x64')C.fail('TOOL_PAYLOAD_INVALID');}
   for(const p of m.packages)if(p.archivePath){C.safeName(p.archivePath);if(!p.archivePath.startsWith('packages/')||!m.files.some(f=>f.path===p.archivePath&&f.sha256===p.sourceSHA256))C.fail('PACKAGE_SOURCE_INVALID');}
@@ -174,7 +229,7 @@ async function createBackup(options){
     const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
     const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
     const summary=coverageSummary(before.missing,before.excluded);
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;

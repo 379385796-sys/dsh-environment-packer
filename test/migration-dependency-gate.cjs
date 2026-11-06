@@ -30,12 +30,24 @@ const fakeHost={version:'0.2.2-rc.1',proof:{platform:process.platform,arch:proce
   assert.equal(backup.manifest.compatibility.dependencyIssues[0].range,'^3.19.0');
   assert.equal(backup.manifest.compatibility.dependencyIssues[0].actual,'3.18.5');
   assert.equal(backup.manifest.compatibility.dependencyIssues[0].state,'recorded');
+  // v0.6.3: the recorded identity must be the real package name. Earlier
+  // acceptance notes showed `@//deepseek-ai/schemastery`; verify that no
+  // artifact or plan carries a mangled scope separator.
+  assert.match(backup.manifest.compatibility.dependencyIssues[0].name,/^@[a-z0-9._-]+\/[a-z0-9._-]+$/i);
+  assert.equal(JSON.stringify(backup.manifest).includes('@//'),false);
 
   // 2. Restore re-evaluates the same contract and still blocks the unresolved conflict.
   const arc=R.readArchive(out);
   try{
     const packages=P.packageRecords(arc),compat=P.compatibility(arc.manifest,packages,fakeHost,name=>{const f=arc.manifest.files.find(x=>x.path===name);return f?arc.zip.get(f.path):undefined;});
-    assert(compat.issues.some(i=>i.code==='PEER_VERSION_MISMATCH'&&i.state==='blocked'&&i.critical===true));
+    const restored=compat.issues.find(i=>i.code==='PEER_VERSION_MISMATCH');
+    assert(restored);
+    assert.equal(restored.package,'dsh-rewind-plugin');
+    assert.equal(restored.name,'@deepseek-ai/schemastery');
+    assert.equal(restored.range,'^3.19.0');
+    assert.equal(restored.actual,'3.18.5');
+    assert.equal(restored.state,'blocked');assert.equal(restored.critical,true);
+    assert.equal(P.hasUnresolvedCritical(compat.issues),true);
     assert.equal(!compat.issues.some(i=>i.state==='blocked'),false,'restore must not be applicable');
   }finally{arc.zip.close();}
 
@@ -58,6 +70,6 @@ const fakeHost={version:'0.2.2-rc.1',proof:{platform:process.platform,arch:proce
   const check=D.analyze([{path:'profiles/desktop/node_modules/dsh-rewind-plugin/package.json',manifest:{name:'dsh-rewind-plugin',version:'1.0.0',peerDependencies:{'@deepseek-ai/schemastery':'^3.19.0'},peerDependenciesMeta:{'@deepseek-ai/schemastery':{optional:true}}}},{path:'profiles/desktop/node_modules/@deepseek-ai/schemastery/package.json',manifest:{name:'@deepseek-ai/schemastery',version:'3.18.5'}}],{dshVersion:'0.2.2-rc.1'});
   assert(check.issues.some(i=>i.code==='PEER_VERSION_MISMATCH'));
 
-  fs.writeFileSync(path.join(root,'migration-dependency-gate-result.json'),JSON.stringify({status:'PASS',checks:['recovery/4 archives and records the real peer conflict','restore re-analysis still blocks the conflict','recovery/2+3 strict backup gate unchanged','malformed package metadata still fails before writing','clean peer records zero conflicts','dependency analyzer not globally relaxed'],syntheticOnly:true},null,2));
+  fs.writeFileSync(path.join(root,'migration-dependency-gate-result.json'),JSON.stringify({status:'PASS',checks:['recovery/4 archives and records the real peer conflict','recorded package/range/actual identity is exact and unmangled','restore re-analysis still blocks the conflict','recovery/2+3 strict backup gate unchanged','malformed package metadata still fails before writing','clean peer records zero conflicts','dependency analyzer not globally relaxed'],syntheticOnly:true},null,2));
   console.log('PASS recovery/4 dependency gate: archive records real conflicts; restore stays strict; recovery/2+3 unchanged');
 })().catch(e=>{console.error(e);process.exitCode=1;});

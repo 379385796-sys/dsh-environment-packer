@@ -38,6 +38,28 @@ function sourceStateHash(p){
   for(const r of [p.layout.home,p.layout.agents,p.layout.workspace,path.join(p.layout.state,'data'),path.join(p.layout.state,'packages'),path.join(p.layout.state,'preferences')])if(fs.existsSync(r))walk(r);
   return P.digest(records);
 }
+// Source trees are restored as inert data. Hash exactly what was written so
+// verification can prove the staged tree still matches the archive mapping.
+function sourceTreeDigest(p){
+  const out=[];
+  for(const t of p.sourceTrees||[]){
+    const root=path.join(p.layout.home,t.name);if(!fs.existsSync(root))C.fail('SOURCE_TREE_MISSING');C.noLinks(root);
+    const rows=[];
+    function walk(dir,rel){
+      C.noLinks(dir);
+      for(const d of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name,'en'))){
+        const q=path.join(dir,d.name),r=rel?rel+'/'+d.name:d.name;
+        if(d.isSymbolicLink())C.fail('SOURCE_TREE_CHANGED');
+        if(d.isDirectory())walk(q,r);
+        else if(d.isFile())rows.push({path:r,bytes:fs.statSync(q).size,sha256:C.sha(C.readStable(q))});
+        else C.fail('SOURCE_TREE_CHANGED');
+      }
+    }
+    walk(root,'');rows.sort((a,b)=>a.path.localeCompare(b.path,'en'));
+    out.push({name:t.name,files:rows.length,bytes:rows.reduce((n,r)=>n+r.bytes,0),sha256:P.digest(rows)});
+  }
+  return out;
+}
 async function apply(p,{confirmPrivate=false,confirmExecution=false,signal,onFile}={}){
   if(!confirmPrivate||!confirmExecution)C.fail('MIGRATION_CONFIRMATION_REQUIRED');P.validatePlan(p);if(!p.canApply)C.fail('MIGRATION_PLAN_BLOCKED');
   const fresh=await P.plan({zipFile:p.zipFile,installation:p.host.installation,workspace:p.layout.workspace});if(P.digest(fresh)!==P.digest(p))C.fail('PLAN_CHANGED');
@@ -78,7 +100,7 @@ async function apply(p,{confirmPrivate=false,confirmExecution=false,signal,onFil
       const mnemon=p.tools.find(t=>t.name==='mnemon');if(mnemon)json(path.join(l.home,'PACKER-TOOL-PROVENANCE.json'),{name:mnemon.name,version:mnemon.version,sha256:mnemon.sha256,planId:p.planId},true);
       save(p,s,'staged');arc.zip.assertUnchanged();
     }finally{arc.zip.close();}
-    guard.assertHeld();s=state(p);s.stagedSHA256=sourceStateHash(p);save(p,s,'staged');return {ok:true,phase:'staged',planId:p.planId,canCommit:false,issues:p.issues};
+    guard.assertHeld();s=state(p);s.sourceTrees=sourceTreeDigest(p);s.stagedSHA256=sourceStateHash(p);save(p,s,'staged');return {ok:true,phase:'staged',planId:p.planId,canCommit:false,issues:p.issues};
   }catch(e){if(fs.existsSync(journal(p))){s.error=/^[A-Z0-9_]+$/.test(e.code||'')?e.code:'MIGRATION_FAILED';save(p,s,'needs-attention');}throw e;}finally{await guard.release();}
 }
 function childEnvironment(p){
@@ -116,6 +138,7 @@ async function boot(p,round,{onReady,port=0}={}){
 async function verifyCore(p,guard){
   assertBinding(p,{staged:true});let s=state(p);if(!['staged','verification-failed'].includes(s.phase))C.fail('TRANSACTION_STATE_INVALID');
   if(s.stagedSHA256!==sourceStateHash(p))C.fail('STAGED_DATA_CHANGED');
+  const trees=sourceTreeDigest(p);if(JSON.stringify(trees)!==JSON.stringify(s.sourceTrees||[]))C.fail('SOURCE_TREE_CHANGED');
   if(P.hasUnresolvedCritical(p.issues))C.fail('CRITICAL_DATA_UNVERIFIED');
   try{
     const databases=[];for(const d of p.datasets.filter(d=>d.adapter==='sqlite-preserve')){
@@ -124,7 +147,7 @@ async function verifyCore(p,guard){
       const run=require('node:child_process').spawnSync(tool.to,['status','--readonly','--data-dir',path.dirname(path.dirname(path.dirname(file))),'--store',path.basename(path.dirname(file))],{env:{...childEnvironment(p),MNEMON_DATA_DIR:path.dirname(path.dirname(path.dirname(file)))},encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:1024*1024});if(run.error||run.status!==0)C.fail('MEMORY_BUSINESS_READ_FAILED');databases.at(-1).nativeRead='passed';
     }
     const rounds=[];rounds.push(await boot(p,1));rounds.push(await boot(p,2));
-    const receipt={planSHA256:p.planSHA256,zipSHA256:p.zipSHA256,status:'verified',rounds,databases,verifiedStateSHA256:sourceStateHash(p),hostSHA256:P.digest(p.host),requiresStartupValidation:false};
+    const receipt={planSHA256:p.planSHA256,zipSHA256:p.zipSHA256,status:'verified',rounds,databases,sourceTrees:trees,verifiedStateSHA256:sourceStateHash(p),hostSHA256:P.digest(p.host),requiresStartupValidation:false};
     guard.assertHeld();json(path.join(p.layout.state,'verification.json'),receipt,true);s=state(p);save(p,s,'verified');return receipt;
   }catch(e){s=state(p);s.error=e.code||'VERIFICATION_FAILED';save(p,s,'verification-failed');throw e;}
 }
@@ -146,4 +169,4 @@ async function rollbackCore(p,guard){
   save(p,s,'rolled-back');return {ok:true,status:'rolled-back',diagnosticsPreserved:true,sourceAndExistingEnvironmentsUntouched:true};
 }
 const verify=p=>guarded(p,g=>verifyCore(p,g)),commit=p=>guarded(p,g=>commitCore(p,g)),rollback=p=>guarded(p,g=>rollbackCore(p,g));
-module.exports={...P,apply,verify,commit,rollback,state,assertBinding,destination,memoryPath,sourceStateHash,childEnvironment,boot};
+module.exports={...P,apply,verify,commit,rollback,state,assertBinding,destination,memoryPath,sourceStateHash,sourceTreeDigest,childEnvironment,boot};

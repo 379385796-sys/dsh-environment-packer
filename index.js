@@ -202,7 +202,7 @@ export function apply(ctx, config = {}) {
             ok: true,
             profileDirectory: currentProfile,
             taskOverview: readUiOverview(process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh')),
-            version: '0.6.2',
+            version: '0.6.3',
             coldOnly: true,
             quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),

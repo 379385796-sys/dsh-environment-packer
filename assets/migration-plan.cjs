@@ -26,7 +26,10 @@ function compatibility(manifest,packages,host,readSource){
   for(const p of packages){try{require('./provider-runtime.cjs').validateProviderRuntime(p.manifest,{node:proof.node,electron:proof.electron,platform:proof.platform,arch:proof.arch},host.version);}catch{issues.push({code:'PLUGIN_RUNTIME_MISMATCH',plugin:p.manifest.name,state:'blocked',critical:true});}}
   for(const p of packages)if(/^@deepseek-ai\/dsh(?:-|$)/.test(p.manifest.name)&&proof.providers.some(v=>v.name===p.manifest.name))issues.push({code:'HOST_PACKAGE_SHADOWING',plugin:p.manifest.name,state:'unknown',critical:true});
   if(manifest.sourceRuntime.platform!==proof.platform||manifest.sourceRuntime.arch!==proof.arch)issues.push({code:'PLATFORM_OR_ARCH_CHANGED',state:'blocked',critical:true});
-  const native=manifest.files.filter(f=>f.path.endsWith('.node')).map(f=>({path:f.path,state:manifest.sourceRuntime.nodeModules===proof.nodeModules?'requires-load-test':'unknown'}));
+  // Prebuilt binaries inside preserved local source trees are inert data, not
+  // environment native modules; they must not create a runtime gate.
+  const sourcePrefixes=(manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
+  const native=manifest.files.filter(f=>f.path.endsWith('.node')&&!sourcePrefixes.some(prefix=>f.path.startsWith(prefix))).map(f=>({path:f.path,state:manifest.sourceRuntime.nodeModules===proof.nodeModules?'requires-load-test':'unknown'}));
   if(native.some(n=>n.state==='unknown'))issues.push({code:'NATIVE_RUNTIME_UNVERIFIED',state:'unknown',critical:true});
   if(host.capabilities.sessionVersion!==4||!host.capabilities.zstd||!host.capabilities.projectKeyV1||!host.capabilities.workspaceV2)issues.push({code:'TARGET_DATA_CAPABILITY_UNKNOWN',state:'unknown',critical:true});
   // Version differences themselves never add an issue. Declared engines/peers still apply.
@@ -44,8 +47,12 @@ function targetLayout(workspace,planId){
 }
 async function scanData(arc){
   const roots=[...arc.manifest.roots],issues=[],datasets=[],skills=[],storage=[],files=arc.manifest.files;
+  // Preserved local source trees are inert data, not environment datasets.
+  // Never interpret their .db/.json/.md files as storage, database or skills.
+  const sourcePrefixes=(arc.manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
   function workspace(p){if(!roots.some(r=>r.kind==='workspace'&&A.canonical(r.path)===A.canonical(p)))roots.push({id:'workspace-'+A.id(p),kind:'workspace',path:p,exists:false});}
   for(const f of files){
+    if(sourcePrefixes.some(prefix=>f.path.startsWith(prefix)))continue;
     if(f.path.startsWith('home-data/sessions/')&&/\.jsonl(?:\.zstd)?$/.test(f.path)){
       const bytes=get(arc,f),{header}=A.decodeSession(bytes,f.path);for(const cwd of A.sessionPaths(bytes,f.path))workspace(cwd);
       datasets.push({path:f.path,adapter:'session-v4',sessionId:header.id,version:header.version,state:header.version===4?'converted':'unknown',critical:true});if(header.version!==4)issues.push({code:'SESSION_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
@@ -91,7 +98,10 @@ async function plan({zipFile,installation,workspace}){
     const planId=digest({zipSHA256,host:host.proof,workspace:path.resolve(workspace)}),layout=targetLayout(workspace,planId),map=A.mappings(data.roots,layout.workspace);
     const external=data.roots.filter(r=>['memory','skills','agents'].includes(r.kind)).map(r=>({id:r.id,kind:r.kind,owners:r.owners||[],workspaceRelative:r.workspaceRelative===true,from:r.path,to:r.kind==='agents'?layout.agents:r.workspaceRelative?A.mapPath(r.path,map):path.join(layout.state,'data',r.id)}));
     const issues=[...compatibilityResult.issues,...data.issues,...(arc.manifest.coverage.missing||[]).map(i=>({...i,state:'unknown'})),...(arc.manifest.coverage.excluded||[]).filter(i=>i.needsReview).map(i=>({code:'HOME_ITEM_UNCLASSIFIED',name:i.name,state:'unknown',critical:true}))];
-    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
+    // Source trees are restored into the new Home as data only. They are never
+    // activated as plugins and never rewritten as configuration.
+    const sourceTrees=(arc.manifest.sourceTrees||[]).map(t=>({name:t.name,to:path.join(layout.home,t.restorePath),files:t.fileCount,bytes:t.bytes,activation:'data-only'}));
+    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),sourceTrees,datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
     result.expectedSkills=data.skills.map(s=>({...s,cwd:s.path.startsWith('workspaces/')?map.find(r=>r.id===s.path.split('/')[1])?.to||layout.workspace:layout.workspace}));
     result.requiresPreferenceImport=arc.manifest.files.some(f=>f.path==='preferences/dsh-chat-comfort.settings.v1.json');
     result.expectedStorage=data.storage;
@@ -112,5 +122,6 @@ function validatePlan(p){
   const l=p.layout,expectedState=path.join(path.dirname(l.workspace),'.'+path.basename(l.workspace)+'.dsh-state-'+p.planId.slice(0,12));
   for(const [key,expected]of Object.entries({state:expectedState,parent:path.dirname(l.workspace),home:path.join(expectedState,'home'),profile:path.join(expectedState,'home/profiles/desktop'),agents:path.join(expectedState,'agents'),userData:path.join(expectedState,'electron')}))if(l[key]!==expected)C.fail('PLAN_LAYOUT_INVALID');
   for(const r of p.mappings)if(!A.inside(l.workspace,r.to))C.fail('PLAN_LAYOUT_INVALID');for(const r of p.externalRoots)if(!A.inside(l.state,r.to)&&!(r.workspaceRelative&&A.inside(l.workspace,r.to)))C.fail('PLAN_LAYOUT_INVALID');
+  for(const t of p.sourceTrees||[])if(t.to!==path.join(l.home,t.name)||!A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');
 }
 module.exports={stable,digest,get,hasUnresolvedCritical,packageRecords,compatibility,targetLayout,scanData,inspect,plan,validatePlan};

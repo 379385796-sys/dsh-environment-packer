@@ -1,6 +1,6 @@
 # Cold backup and fresh-home restoration
 
-> **v0.6.2 当前入口**：Packer 0.6.0 起生成的冷备归档为 `dsh-private-recovery/4`（迁移通道）。本页前 12 条与「全新 Home」相关的段落描述的是 **recovery/2、/3 严格恢复通道**，只适用于旧格式归档；`/4` 使用**新 DSH 安装目录 + 全新 Workspace 根**，见 [MIGRATION.md](MIGRATION.md)。历史段落按当时版本保留，不代表当前默认流程。
+> **v0.6.3 候选入口（已发布 v0.6.2）**：Packer 0.6.0 起生成的冷备归档为 `dsh-private-recovery/4`（迁移通道）。本页前 12 条与「全新 Home」相关的段落描述的是 **recovery/2、/3 严格恢复通道**，只适用于旧格式归档；`/4` 使用**新 DSH 安装目录 + 全新 Workspace 根**，见 [MIGRATION.md](MIGRATION.md)。v0.6.3 起 `/4` 归档可含 `home-data/plugins-local/` 源码树；恢复时仅落到新 Home 的 `plugins-local` 作为数据，不激活为插件。历史段落按当时版本保留，不代表当前默认流程。
 
 1. Install the same compatible DSH/runtime first. Completely exit DSH, including tray and Host, before a database-consistent backup.
 2. Read the private-data warning. Choose a local existing output directory and a new ZIP name. Confirm private scope and quiescence only when true.
@@ -67,8 +67,8 @@ The launcher uses the Windows .NET Framework WPF assemblies already present in t
 
 In the assistant, **environment backup** means the ZIP previously created by Packer, not a DSH installer. **DSH program used for recovery** means the trusted installed `DeepSeek Harness.exe`, not a file extracted from the backup. Selecting it performs background Node/host checks without opening DSH. It is optional for archive-only inspection, but required and must satisfy the recorded proof before recovery. The ZIP contains neither the DSH installer nor external models/workspaces.
 
-## 当前工具包（v0.6.2）
+## 当前工具包（v0.6.3 候选；已发布 v0.6.2）
 
-从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载 `Packer-v0.6.2-Standalone-Recovery.zip` 与 `SHA256SUMS.txt`，校验后解开到独立、已存在的工具目录。保留完整 `package` 目录（含 `bin`、`assets`、`vendor`）以及 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`；不要只复制 EXE。备份 ZIP 不含 DSH 安装程序、外部模型或未收录的外部资源。
+已发布版本仍从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载 `Packer-v0.6.2-Standalone-Recovery.zip` 与 `SHA256SUMS.txt`。v0.6.3 候选的独立工具 ZIP 与校验值在隔离工作区构建，见 [RELEASE-0.6.3.md](RELEASE-0.6.3.md)；未上传 Release，不要与已发布版本混用。解开到独立、已存在的工具目录，保留完整 `package` 目录（含 `bin`、`assets`、`vendor`）以及 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`；不要只复制 EXE。备份 ZIP 不含 DSH 安装程序、外部模型或未收录的外部资源。
 
 容量与残留位置见 [BUILD-TEST.md](BUILD-TEST.md) 与 [CLEANUP.md](CLEANUP.md)。本页中的 v0.5.0 下载说明已移除；历史验收段落按当时版本保留。

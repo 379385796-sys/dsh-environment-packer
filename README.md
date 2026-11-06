@@ -6,6 +6,12 @@
 
 > v0.6.3 的范围、验收与剩余边界见 [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md)。下载后请核对 `SHA256SUMS.txt`；保留旧版回退包与正式备份。
 
+## 最终验收说明（2026-11-07）
+
+正式版本保持 **v0.6.3**，没有新增产品修复。独立复核确认：普通 Node 缺少 `--expose-internals` 会使浏览器消费者源码解析失败，被保守报告为 `HOST_BROWSER_PEER_UNPROVEN`；正式冷备、迁移助手和严格恢复助手已传入该标志。浏览器 peer 证明使用 Node 内部 Acorn，存在运行时兼容边界；能力缺失时仍阻断恢复，不能跳过证明。自编排 `plan/apply/verify/commit` 请遵守[运行时要求](docs/MIGRATION.md#runtime-requirement-for-browser-peer-proof)。
+
+[Market v0.6.3 更新](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/12732)已合并，目录使用与 GitHub Release 相同的 TGZ。Rewind 不是 Packer 的必需插件；旧归档内的真实 peer 冲突不会因卸载源环境插件而消失。源环境修正后只能通过正常冷备流程、私人确认另建归档，不能修改旧 ZIP。合成隔离恢复验收不认证私人数据的完整业务恢复。
+
 ## 0.6.3 覆盖分类与恢复诊断
 
 - **本地插件源码树**：`~/.dsh/plugins-local` 不是 DSH 运行时路径，也没有配置引用；其中的包是用户本地源码。v0.6.3 把它作为**惰性数据**采集到 `home-data/plugins-local/`，明确排除 `node_modules` 安装产物，并在清单 `sourceTrees` 记录文件数、字节数、排除项与 `complete`。恢复计划给出到新 Home 的确定映射（`<新Home>/plugins-local`），`apply` 暂存后 `verify` 重新计算文件/字节/摘要，不一致即 `SOURCE_TREE_CHANGED`。源码树只恢复为数据，不会被激活为插件，也不会改写配置。

@@ -6,6 +6,12 @@ Private offline backup and guarded environment migration for DSH, with independe
 
 > Scope, acceptance and remaining limits: [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md). Verify `SHA256SUMS.txt` and retain previous rollback packages and private backups. Market availability depends on the catalog PR being merged.
 
+## Final acceptance notes (2026-11-07)
+
+The product remains **v0.6.3**, with no new product-code fix. Independent review reproduced missing browser-consumer proof under ordinary Node without `--expose-internals`. The shipped cold-backup, migration and strict-recovery assistants already pass this flag. Browser proof depends on Node\'s internal Acorn and remains runtime-sensitive; missing capability blocks recovery. Custom orchestration must follow the [runtime requirement](docs/MIGRATION.md#runtime-requirement-for-browser-peer-proof), never bypass proof.
+
+The [Market v0.6.3 update](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/12732) is merged and references the same TGZ as GitHub Release. Rewind is not required by Packer. Removing it from a source Profile does not repair an existing archive; create a new archive through the normal cold-backup and private-confirmation flow. Synthetic isolated recovery does not certify full business recovery of private data.
+
 ## 0.6.3 coverage classification and recovery diagnostics
 
 - **Local plugin source trees**: `~/.dsh/plugins-local` is not a DSH runtime path and is not referenced by configuration; it holds user-authored local packages. v0.6.3 preserves it as **inert data** under `home-data/plugins-local/`, explicitly excludes `node_modules` install artifacts, and records file count, bytes, exclusions and `complete` in manifest `sourceTrees`. The restore plan exposes a deterministic mapping to `<new Home>/plugins-local`; after staging, `verify` recomputes file/byte/digest fidelity and fails with `SOURCE_TREE_CHANGED` on any mismatch. Source trees are restored as data only: never activated as plugins and never used to rewrite configuration.

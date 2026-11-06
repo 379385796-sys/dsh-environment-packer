@@ -30,6 +30,14 @@ Rollback disables activation and preserves the new transaction/data for diagnosi
 
 **Archive limits**: 128 MiB per file, 2 GiB total payload, 60,000 entries (including manifest/directory headroom). Recovery requires a free-space budget of `payloadBytes × 3 + 128 MiB`; this is a precheck budget, not the size of data already written. Limits fail explicitly rather than trimming data.
 
+## Runtime requirement for browser peer proof
+
+Browser-consumer analysis runs in the **orchestrating process**, while host-provider inspection can run in a child DSH process. A successful child host probe does not establish that the orchestrator can load `internal/deps/acorn/acorn/dist/acorn`. Use the trusted target Desktop executable in process-local `ELECTRON_RUN_AS_NODE=1` mode with `--expose-internals` before the script, or a separately validated Node runtime with `--expose-internals`. The packaged cold, migration and strict-recovery assistants already supply this flag. Keep temporary files and caches in an explicitly configured task directory; restore process environment afterwards.
+
+Without parser access, `consumer()` catches the failure as `consumer-source-unproven`, which becomes critical `HOST_BROWSER_PEER_UNPROVEN`. This is insufficient proof, not confirmed host incompatibility. The same diagnostic can also represent missing or invalid sources, so do not assume every such issue is a flag error. Re-run with the supported runtime and require actual provider/consumer bindings. Never remove critical issues or force admission. Internal Acorn is an intentional runtime dependency, not a stable public Node API; unsupported runtimes remain fail-closed.
+
+The final v0.6.3 archive reviewed on 2026-11-07 still has a real Rewind/schemastery peer mismatch after all 16 browser bindings are proven. Rewind is not a Packer prerequisite. Current source dependency changes do not alter old archives; another private cold backup requires the usual user confirmation. Integrity checks and synthetic startup verification do not certify private business recovery.
+
 ## Deterministic interfaces
 
 `assets/migration-engine.cjs` exports `inspect`, `plan`, `apply`, `verify`, `commit`, `rollback`. GUI and CLI share it. `assets/migration-cli.cjs <action> --request <absolute-json-file>` emits one JSON result envelope, `{ok,result}` or `{ok:false,code}`. Use a supported Node runtime or the target executable in its supported Node mode. Requests and output must be stored in a private directory.

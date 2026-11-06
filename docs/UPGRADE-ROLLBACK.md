@@ -5,7 +5,7 @@
 ## v0.6.3 upgrade / rollback notes
 
 - Keep v0.6.2 attachments, installed-package rollback material and formal backups untouched. Verify v0.6.3 hashes before using the normal offline install path.
-- Upgrade path is unchanged: normally exit every DSH instance, keep the existing Profile pnpm store, and install the candidate TGZ through the official offline plugin path (`dsh plugin --profile desktop add <TGZ> --offline --ignore-scripts`).
+- Upgrade path is unchanged: normally exit every DSH instance, keep the existing Profile pnpm store, and install the verified TGZ through the official offline plugin path (`dsh plugin --profile desktop add <TGZ> --offline --ignore-scripts`).
 - **Data/behaviour change**: new cold backups may include `home-data/plugins-local/` source files and an optional `sourceTrees` manifest entry. Restore writes them to the new Home's `plugins-local` as inert data only; it does not install, link or activate those plugins. Existing /4 archives remain readable; existing ZIPs are never rewritten.
 - After restart, confirm the Packer page reports `0.6.3`. A v0.6.3 archive cannot be fully committed while the recorded `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0 / 3.18.5` conflict remains unresolved; this is the unchanged strict gate, not an installation failure.
 - Rollback: stop relevant processes normally, preserve diagnostics, restore only the previous verified Packer payload and package-manager metadata. Do not overwrite the Profile or private data wholesale. v0.6.2 does not understand `sourceTrees` as a plan field but can still read the archive; it may conservatively flag a `.db` inside a source tree as unknown data (the current `plugins-local` has none).

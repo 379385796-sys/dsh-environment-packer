@@ -59,7 +59,7 @@
 dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 ```
 
-升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 **0.6.3（候选）**；已发布版本仍应为 0.6.2。独立恢复工具请保留完整目录，不能只复制 EXE。
+升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 **0.6.3**。独立恢复工具请保留完整目录，不能只复制 EXE。
 
 ## 备份与恢复
 

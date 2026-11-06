@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.6.3 — 2026-11-07（候选，未发布）
+## 0.6.3 — 2026-11-07
 
 - **`plugins-local` 分类与保全**：确认为用户本地插件源码区，不是 DSH 运行时路径，也没有 Profile/配置引用。recovery/4 将其源码（排除 `node_modules` 安装产物）采集到 `home-data/plugins-local/`，清单新增可选 `sourceTrees`，记录文件数、字节数、排除项与 `complete`。旧 /4 归档无此字段仍可读取。
 - **恢复映射与保真验证**：计划为每个源码树给出 `to=<新Home>/plugins-local`、`activation=data-only`；`apply` 写入后记录文件/字节/摘要，`verify` 重新计算并在不一致时以 `SOURCE_TREE_CHANGED` 拒绝。源码树不参与插件/依赖解析，也不会被改写为配置。采集失败（链接、类型、容量）不阻断整个归档，而是以 `LOCAL_SOURCE_TREE_INCOMPLETE` 关键缺口报告。
-- **缓存 `.bak` 明确排除**：仅当同名 live 文件存在且为普通文件时，`.dshw-{usage,size,turn}.json.<qualifier>.bak` 记为 `superseded-runtime-cache-backup`（含 `supersededBy`），不再作为未分类关键项；live 文件缺失时仍保留 critical。未知 Home 项继续保守告警。
+- **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
 - **peer 冲突记录核对**：正式归档的 `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0 / 3.18.5` 记录准确，包名无 `@//` 重写；恢复计划仍将其标记为 blocked/critical 并阻止 apply/commit。未修改第三方插件、生产依赖或 peer 声明。
 - 不改变 recovery/2、/3 语义，不改变归档格式版本，不放宽 /4 的 verify/commit 门禁，不新增服务、自动清理或 UI 功能。
 

@@ -1,15 +1,15 @@
-# DSH Environment Packer · v0.6.3（候选）
+# DSH Environment Packer · v0.6.3
 
 **环境恢复包：为 DSH 创建私人冷备份，并在新路径、新兼容宿主上恢复环境。**
 
-[已发布 v0.6.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
+[v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
 
-> **v0.6.3 是候选，尚未发布。** 已发布版本仍为 v0.6.2；本候选的范围、测试与剩余边界见 [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md)，精确哈希以同目录 `SHA256SUMS.txt` 为准。不覆盖 v0.6.2 的 Release、附件、Market 条目或正式备份。
+> v0.6.3 的范围、验收与剩余边界见 [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md)。下载后请核对 `SHA256SUMS.txt`；保留旧版回退包与正式备份。
 
 ## 0.6.3 覆盖分类与恢复诊断
 
 - **本地插件源码树**：`~/.dsh/plugins-local` 不是 DSH 运行时路径，也没有配置引用；其中的包是用户本地源码。v0.6.3 把它作为**惰性数据**采集到 `home-data/plugins-local/`，明确排除 `node_modules` 安装产物，并在清单 `sourceTrees` 记录文件数、字节数、排除项与 `complete`。恢复计划给出到新 Home 的确定映射（`<新Home>/plugins-local`），`apply` 暂存后 `verify` 重新计算文件/字节/摘要，不一致即 `SOURCE_TREE_CHANGED`。源码树只恢复为数据，不会被激活为插件，也不会改写配置。
-- **缓存备份文件**：`.dshw-usage.json.before-recharge-fix.bak` 经代码引用、生命周期与元数据核对，确认是已采集的 `.dshw-usage.json` 的手工前置快照，无运行时读取方。仅当同名 live 文件存在且为普通文件时，`.dshw-{usage,size,turn}.json.<qualifier>.bak` 被**明确排除**为 `superseded-runtime-cache-backup`，并记录 `supersededBy`；live 文件缺失时仍按 critical 缺口保留，不默认排除。
+- **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
 - **peer 冲突记录与门禁**：正式归档中的记录为 `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0`（实际 `3.18.5`），包名、范围和实际版本准确，不存在 `@//` 形式的重写名。恢复计划重新分析后仍将其标为 `blocked/critical` 并阻止 `apply`/`commit`。本轮没有修改第三方插件、生产依赖或 peer 声明，也没有因为告警数量而放宽门禁。
 - recovery/2、/3 的严格语义未改；recovery/4 的 `verify`/`commit` 门禁未放宽。新增字段对旧归档可选，旧 `dsh-private-recovery/4` 归档仍可读取。
 
@@ -43,15 +43,15 @@
 
 ## 下载与安装
 
-**已发布版本**：从 [v0.6.2 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) 下载：
+**已发布版本**：从 [v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) 下载：
 
 | 文件 | 用途 |
 |---|---|
-| `dsh-environment-packer-0.6.2.tgz` | DSH 插件安装包 |
-| `Packer-v0.6.2-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
+| `dsh-environment-packer-0.6.3.tgz` | DSH 插件安装包 |
+| `Packer-v0.6.3-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
 | `SHA256SUMS.txt` / 同名 `.sha256` | 下载校验值 |
 
-**v0.6.3 候选**：TGZ、独立恢复 ZIP 与 `SHA256SUMS.txt` 已在隔离工作区构建，测试与边界见 [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md)，哈希以 `SHA256SUMS.txt` 为准；尚未上传 GitHub Release。安装候选包前请核对哈希；候选与已发布版本不要混用。安装方式与回退边界见 [UPGRADE-ROLLBACK.md](docs/UPGRADE-ROLLBACK.md)。
+安装与回退边界见 [UPGRADE-ROLLBACK.md](docs/UPGRADE-ROLLBACK.md)。DSH Market 的可用版本以合并状态为准。
 
 保存当前环境并正常退出 DSH，使用当前 Desktop 随附的官方插件管理流程安装本地 TGZ。已配置 CLI 时可用：
 

@@ -1,8 +1,8 @@
-# v0.6.3 — 覆盖分类与恢复诊断（候选）
+# v0.6.3 — 覆盖分类与恢复诊断
 
 日期：2026-11-07（Australia/Sydney）。基线：v0.6.2 正式 tag `e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`。
 
-> **状态：候选，未发布。** 本文件描述候选源码与构建产物，不表示 GitHub Release、DSH Market 或正式安装已经更新。正式发布、代码验收与必要的最终修正由后续阶段完成。
+> v0.6.3 发布说明。正式安装、冷备和远端附件校验的证据见独立 Codex 最终验收报告；Market 合并状态独立披露。
 
 ## 1. 本版范围
 
@@ -27,7 +27,7 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 - **已确认**：所有已安装插件、`plugins-local` 源码与 DSH 应用资源均无对该 `.bak` 文件名的读取；唯一匹配仍是 Packer 的 Home 白名单中的 live 文件名。
 - **已确认**：live `.dshw-usage.json` 属于既有 Home 白名单并已采集；`.bak` 是修复充值逻辑前的手工快照。
 - **合理推断**：其所属鲸鱼插件当前未安装，`.dshw-*` 是遗留缓存；该 `.bak` 不参与任何恢复语义。
-- **决定**：**明确排除**，但加条件：仅当同名 live 文件存在且为普通文件时，归类为 `superseded-runtime-cache-backup` 并记录 `supersededBy`；live 缺失时它可能是唯一副本，继续作为 critical 未分类项。规则不覆盖任意 `.bak`。
+- **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
 
 ### 2.3 `dsh-rewind-plugin` peer 冲突
 
@@ -40,7 +40,7 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 
 - `assets/migration-archive.cjs`
   - 新增 `LOCAL_SOURCE_HOME`、`LOCAL_SOURCE_EXCLUDED`、`CACHE_BACKUP` 与 `addSourceTree()`。
-  - `discover()` 明确分类 `plugins-local`（`captured-local-plugin-source`）与带 live 文件的缓存 `.bak`（`superseded-runtime-cache-backup`，含 `supersededBy`）；未知项仍 `needsReview:true`。
+- **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
   - `inventory()` 采集 `plugins-local` 源码，排除任意层级 `node_modules`；失败（链接、类型、容量、路径）不阻断整个归档，转为 `LOCAL_SOURCE_TREE_INCOMPLETE` 关键缺口，并把对应分类标记为需复核。
   - 清单新增可选 `sourceTrees`：名称、归档前缀、恢复相对路径、文件数、字节数、排除项、`complete`。
   - `validate()` 校验 `sourceTrees` 形状，并要求其文件数/字节数与清单文件逐项吻合；旧归档无该字段仍通过。
@@ -57,13 +57,13 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 
 | 项目 | 结果 |
 |---|---|
-| `test/v063-source-coverage.cjs` | PASS 18 项：源码树采集/排除 `node_modules`、显式分类、未知项保守告警、`.bak` 有无 live 的两种语义、clean 覆盖、确定性映射、暂存摘要、变更/缺失拒绝、清单计数与排除段篡改拒绝、源码树内预编译 `.node` 不触发原生门禁、旧归档兼容、`apply` 实际暂存与 `verify` 源码树门禁 |
+| `test/v063-source-coverage.cjs` | PASS 22 项：源码树采集/排除 `node_modules`、显式分类、未知项保守告警、`.bak` 有无 live 的两种语义、clean 覆盖、确定性映射、暂存摘要、变更/缺失拒绝、清单计数与排除段篡改拒绝、源码树内预编译 `.node` 不触发原生门禁、旧归档兼容、`apply` 实际暂存与 `verify` 源码树门禁 |
 | `test/migration-dependency-gate.cjs` | PASS：/4 记录真实 peer 冲突且包名精确无 `@//`；恢复重分析仍 blocked/critical；/2 /3 严格备份门禁不变；结构错误仍在写盘前失败 |
 | `test/v062-coverage-chain.cjs` | PASS 15 项：偏好采集状态、有界摘要、清单自洽、结果层语义、规范 inspect 与损坏拒绝（回归） |
 | `test/v062-apply-gate.cjs` | PASS 6 项：critical unknown 在创建 state/workspace 前拒绝，干净计划仍可 apply（回归） |
 | `git diff --check` / `node --check` | PASS：无空白错误，改动脚本语法有效 |
 
-未重跑整库或真实运行时认证；`v062-clean-path.cjs` 的真实 DSH 两轮启动未在本轮执行，列入待认证。源码树采集使用真实 `~/.dsh/plugins-local` 的只读元数据核对（113 文件 / 13,164,431 字节，另有 17 文件 / 138,991 字节的 `node_modules` 被排除），未读取文件内容。
+定向回归使用合成数据；新增 `v063-clean-path.cjs` 在真实可信 DSH Node 下执行 inspect → plan → apply → verify（两轮隔离启动与正常关闭）→ commit。源码入口设置为加载即报错，验证其保持惰性；历史快照位于事务目录且不写回 Home。未重跑整库。
 
 ## 5. 兼容性与剩余风险
 
@@ -79,4 +79,6 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 - `Packer-v0.6.3-Standalone-Recovery.zip` — 完整独立恢复工具（含 `Open-Recovery.ps1`、`READ-FIRST.txt`、`TOOLKIT-FILES.sha256`）。
 - `SHA256SUMS.txt` / 同名 `.sha256` — 精确校验值；本文件不内嵌自哈希。
 
-构建、测试与候选冻结在隔离工作区完成；未安装正式 DSH、未发布 GitHub Release、未更新 Market、未覆盖私人 ZIP、未执行生产恢复。
+最终产物与 tag 逐字节核对，保留候选与旧版附件。不执行生产恢复；已知 peer 冲突不降级。
+
+Codex 最终修正：sourceTrees 只允许 plugins-local，强制 node_modules 排除（大小写不敏感），拒绝运行时目录伪装为源码树；verify 两轮启动后再次核对惰性源码摘要。

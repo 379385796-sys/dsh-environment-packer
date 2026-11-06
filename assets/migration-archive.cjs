@@ -37,9 +37,7 @@ const OMIT_HOME=new Set(['profiles','cache','logs','telemetry','dsh-runtimes','.
 // never become environment packages in the restore plan.
 const LOCAL_SOURCE_HOME='plugins-local';
 const LOCAL_SOURCE_EXCLUDED=new Set(['node_modules']);
-// A manual `.bak` of a Packer-known home cache is a superseded snapshot, not a
-// separate data set. Only classify it when the live, captured file still
-// exists; otherwise the backup may be the only copy and stays a critical gap.
+// Preserve historical snapshots outside Home; live values cannot reconstruct history.
 const CACHE_BACKUP=/^(\.dshw-(?:usage|size|turn)\.json)\..+\.bak$/i;
 const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','AGENTS.md','.credentials.yaml','.credentials.yml','settings.yaml','settings.yaml.imported','cordis.patch.yml','.env','dsh-claude-style','rewind-snapshots','skills-manager','llm-deepseek','archive-manager','aik_auto_memory_use','dsh-market','dsh-builtin-browser-host','models','emoji-packs','whale-audio','whale-bubble-imgs','whale-roles','.dshw-size.json','.dshw-turn.json','.dshw-usage.json']);
 async function legacy(){return import(pathToFileURL(path.join(__dirname,'../lib/private-backup.js')).href);}
@@ -80,13 +78,13 @@ async function discover({homeDir,profileDir,workspaceRoot,agentsDir,clientPrefer
   for(const r of roots.filter(r=>['memory','skills'].includes(r.kind)))if(!r.exists&&!r.defaultRoot)missing.push({code:'EXTERNAL_DATA_MISSING',root:r.id,critical:true});
   for(const name of fs.readdirSync(homeDir).sort())if(!USER_HOME.has(name)){
     const captured=roots.some(r=>['memory','skills'].includes(r.kind)&&A.canonical(r.path)===A.canonical(path.join(homeDir,name)));
-    const backupBase=CACHE_BACKUP.exec(name)?.[1],liveBase=backupBase?path.join(homeDir,backupBase):null,superseded=liveBase&&(()=>{try{return fs.lstatSync(liveBase).isFile();}catch{return false;}})()?backupBase:null;
+    const historical=CACHE_BACKUP.test(name);
     const reason=captured?'captured-as-data-root'
       :name===LOCAL_SOURCE_HOME?'captured-local-plugin-source'
       :OMIT_HOME.has(name)||name.startsWith('.deployment-rollback')?'runtime-cache-history-or-task'
-      :superseded?'superseded-runtime-cache-backup'
+      :historical?'captured-historical-data'
       :'unclassified-home-entry';
-    excluded.push({name,reason,...(superseded?{supersededBy:superseded}:{}),needsReview:!captured&&name!==LOCAL_SOURCE_HOME&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')&&!superseded});
+    excluded.push({name,reason,needsReview:!captured&&name!==LOCAL_SOURCE_HOME&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')&&!historical});
   }
   const capture=classifyClientPreferences(clientPreferences),preferences=capture.preferences;
   // An absent field is a real, critical capture gap. Data preservation still
@@ -107,13 +105,25 @@ async function inventory(options){
   else if(fs.existsSync(localSource)){
     const treeFiles=[],treeDirs=[];
     try{
+      if(!fs.lstatSync(localSource).isDirectory())C.fail('SOURCE_TYPE_OR_SIZE');
       addSourceTree(localSource,'home-data/'+LOCAL_SOURCE_HOME,treeFiles,treeDirs);
       files.push(...treeFiles);directories.push(...treeDirs);
       sourceTrees.push({name:LOCAL_SOURCE_HOME,archivePrefix:'home-data/'+LOCAL_SOURCE_HOME,restorePath:LOCAL_SOURCE_HOME,fileCount:treeFiles.length,bytes:treeFiles.reduce((n,f)=>n+f.bytes,0),excluded:[...LOCAL_SOURCE_EXCLUDED].sort(),complete:true});
     }catch(e){
-      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','ARCHIVE_LIMIT','UNSAFE_ARCHIVE_PATH'].includes(e.code))throw e;
+      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','ARCHIVE_LIMIT','UNSAFE_ARCHIVE_PATH','ENOENT','EACCES','EPERM','EIO','ENOTDIR'].includes(e.code))throw e;
       const entry=layout.excluded.find(i=>i.name===LOCAL_SOURCE_HOME);if(entry)entry.needsReview=true;
       layout.missing.push({code:'LOCAL_SOURCE_TREE_INCOMPLETE',tree:LOCAL_SOURCE_HOME,critical:true});
+    }
+  }
+  const historicalData=[];
+  for(const entry of layout.excluded.filter(e=>e.reason==='captured-historical-data')){
+    try{
+      const source=path.join(options.homeDir,entry.name);C.noLinks(source);
+      const rec=fileRecord(source,'packages/home-history/'+entry.name);C.safeName(rec.path);
+      files.push(rec);historicalData.push({name:entry.name,archivePath:rec.path,activation:'archive-only'});
+    }catch(e){
+      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','UNSAFE_ARCHIVE_PATH','ENOENT','EACCES','EPERM','EIO'].includes(e.code))throw e;
+      entry.needsReview=true;layout.missing.push({code:'HISTORICAL_DATA_INCOMPLETE',critical:true});
     }
   }
   for(const r of layout.roots){
@@ -160,7 +170,7 @@ async function inventory(options){
   }
   const seen=new Set();for(const f of files){C.safeName(f.path);if(seen.has(f.path.toLowerCase()))C.fail('SOURCE_PATH_COLLISION');seen.add(f.path.toLowerCase());}
   const total=files.reduce((n,f)=>n+f.bytes,0);if(total>C.MAX_TOTAL-16*1024*1024||files.length+directories.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
-  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,legacyInventory:old};
+  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,historicalData,legacyInventory:old};
 }
 function validate(zip){
   let m;try{m=JSON.parse(zip.get('manifest.json'));}catch{C.fail('INVALID_MANIFEST');}
@@ -191,12 +201,20 @@ function validate(zip){
     if(!Array.isArray(m.sourceTrees)||m.sourceTrees.length>16)C.fail('INVALID_MIGRATION_MANIFEST');
     const trees=new Set();
     for(const t of m.sourceTrees){
-      if(!t||typeof t!=='object'||Array.isArray(t)||typeof t.name!=='string'||!/^[A-Za-z0-9._-]{1,64}$/.test(t.name)||t.name==='.'||t.name==='..'||trees.has(t.name)||t.archivePrefix!=='home-data/'+t.name||t.restorePath!==t.name||t.complete!==true||!Number.isSafeInteger(t.fileCount)||t.fileCount<0||!Number.isSafeInteger(t.bytes)||t.bytes<0||!Array.isArray(t.excluded)||t.excluded.length>8||t.excluded.some(x=>typeof x!=='string'||!/^[A-Za-z0-9._-]{1,32}$/.test(x)))C.fail('INVALID_MIGRATION_MANIFEST');
+      if(!t||typeof t!=='object'||Array.isArray(t)||t.name!==LOCAL_SOURCE_HOME||t.name==='.'||t.name==='..'||trees.has(t.name)||t.archivePrefix!=='home-data/'+t.name||t.restorePath!==t.name||t.complete!==true||!Number.isSafeInteger(t.fileCount)||t.fileCount<0||!Number.isSafeInteger(t.bytes)||t.bytes<0||!Array.isArray(t.excluded)||t.excluded.length!==1||t.excluded[0]!=='node_modules')C.fail('INVALID_MIGRATION_MANIFEST');
+      if(!m.directories.includes(t.archivePrefix)||m.files.some(f=>f.path===t.archivePrefix))C.fail('INVALID_MIGRATION_MANIFEST');
       const prefix=t.archivePrefix+'/',under=m.files.filter(f=>f.path.startsWith(prefix));
       if(under.length!==t.fileCount||under.reduce((n,f)=>n+f.bytes,0)!==t.bytes)C.fail('INVALID_MIGRATION_MANIFEST');
-      const excluded=new Set(t.excluded);
-      if(under.some(f=>f.path.slice(prefix.length).split('/').some(part=>excluded.has(part))))C.fail('INVALID_MIGRATION_MANIFEST');
+      const excluded=new Set(t.excluded.map(x=>x.toLowerCase()));
+      if([...under.map(f=>f.path),...m.directories.filter(n=>n.startsWith(prefix))].some(n=>n.slice(prefix.length).split('/').some(part=>excluded.has(part.toLowerCase()))))C.fail('INVALID_MIGRATION_MANIFEST');
       trees.add(t.name);
+    }
+  }
+  if(m.historicalData!==undefined){
+    if(!Array.isArray(m.historicalData))C.fail('INVALID_MIGRATION_MANIFEST');
+    const seen=new Set();for(const h of m.historicalData){
+      if(!h||typeof h.name!=='string'||!CACHE_BACKUP.test(h.name)||h.archivePath!=='packages/home-history/'+h.name||h.activation!=='archive-only'||seen.has(h.name.toLowerCase())||!m.files.some(f=>f.path===h.archivePath))C.fail('INVALID_MIGRATION_MANIFEST');
+      C.safeName(h.archivePath);seen.add(h.name.toLowerCase());
     }
   }
   for(const p of m.packages)if(typeof p.name!=='string'||!require('./host-proof.cjs').validName(p.name)||typeof p.version!=='string')C.fail('INSTALLED_PACKAGE_INVALID');
@@ -229,7 +247,7 @@ async function createBackup(options){
     const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
     const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
     const summary=coverageSummary(before.missing,before.excluded);
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,historicalData:before.historicalData,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;

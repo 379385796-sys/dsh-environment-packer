@@ -1,15 +1,15 @@
-# DSH Environment Packer · v0.6.3 (candidate)
+# DSH Environment Packer · v0.6.3
 
 Private offline backup and guarded environment migration for DSH, with independent Windows recovery.
 
-[Published v0.6.2](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.2) · [简体中文](README.md) · [Migration guide](docs/MIGRATION.md) · [Recovery preparation](docs/RECOVERY-PREPARATION.md) · [Cleanup](docs/CLEANUP.md)
+[v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) · [简体中文](README.md) · [Migration guide](docs/MIGRATION.md) · [Recovery preparation](docs/RECOVERY-PREPARATION.md) · [Cleanup](docs/CLEANUP.md)
 
-> **v0.6.3 is a candidate and is not published.** The published version remains v0.6.2. Scope, tests and residual boundaries are in [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md); exact hashes are in `SHA256SUMS.txt`. This candidate does not replace the v0.6.2 Release, attachments, Market entry or any formal backup.
+> Scope, acceptance and remaining limits: [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md). Verify `SHA256SUMS.txt` and retain previous rollback packages and private backups. Market availability depends on the catalog PR being merged.
 
 ## 0.6.3 coverage classification and recovery diagnostics
 
 - **Local plugin source trees**: `~/.dsh/plugins-local` is not a DSH runtime path and is not referenced by configuration; it holds user-authored local packages. v0.6.3 preserves it as **inert data** under `home-data/plugins-local/`, explicitly excludes `node_modules` install artifacts, and records file count, bytes, exclusions and `complete` in manifest `sourceTrees`. The restore plan exposes a deterministic mapping to `<new Home>/plugins-local`; after staging, `verify` recomputes file/byte/digest fidelity and fails with `SOURCE_TREE_CHANGED` on any mismatch. Source trees are restored as data only: never activated as plugins and never used to rewrite configuration.
-- **Cache backup files**: `.dshw-usage.json.before-recharge-fix.bak` was checked against code references, lifecycle and metadata. It is a manual pre-fix snapshot of the captured `.dshw-usage.json` with no runtime reader. Only when the live file exists as a regular file, `.dshw-{usage,size,turn}.json.<qualifier>.bak` is **explicitly excluded** as `superseded-runtime-cache-backup` with `supersededBy` recorded; if the live file is missing, the backup may be the only copy and remains a critical gap.
+- **Historical cache snapshots**: known `.dshw-{usage,size,turn}.json.<qualifier>.bak` files are preserved under `packages/home-history/`, even without a live file. Live values cannot reconstruct historical values. Recovery keeps them outside runtime Home, in transaction data, without activating or overwriting caches. Unreadable snapshots remain critical gaps.
 - **Peer conflict record and gate**: the formal archive records `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0` (actual `3.18.5`). Package name, range and actual version are exact; no `@//` rewritten name exists. Restore re-analysis still marks it `blocked/critical` and refuses `apply`/`commit`. No third-party plugin, production dependency or peer declaration was modified, and no gate was relaxed to reduce warning counts.
 - recovery/2 and /3 semantics are unchanged; recovery/4 `verify`/`commit` gates are not relaxed. New manifest fields are optional, so existing `dsh-private-recovery/4` archives remain readable.
 
@@ -45,7 +45,7 @@ Download the TGZ and matching SHA-256 from the Release. Save your environment an
 dsh plugin --profile desktop add "<absolute TGZ path>" --offline --ignore-scripts
 ```
 
-Retain the existing Profile's pnpm store. Updating Packer does not require rebuilding the Profile or changing other plugins. Restart and confirm 0.6.3 (candidate); the published version remains 0.6.2. Candidate hashes are in `SHA256SUMS.txt`; published downloads remain on the v0.6.2 Release.
+Retain the existing Profile's pnpm store. Updating Packer does not require rebuilding the Profile or changing other plugins. Restart and confirm 0.6.3. Verify the exact release assets using `SHA256SUMS.txt`.
 
 ## Backup and recover
 

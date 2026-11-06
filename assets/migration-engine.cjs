@@ -147,6 +147,7 @@ async function verifyCore(p,guard){
       const run=require('node:child_process').spawnSync(tool.to,['status','--readonly','--data-dir',path.dirname(path.dirname(path.dirname(file))),'--store',path.basename(path.dirname(file))],{env:{...childEnvironment(p),MNEMON_DATA_DIR:path.dirname(path.dirname(path.dirname(file)))},encoding:'utf8',windowsHide:true,timeout:15000,maxBuffer:1024*1024});if(run.error||run.status!==0)C.fail('MEMORY_BUSINESS_READ_FAILED');databases.at(-1).nativeRead='passed';
     }
     const rounds=[];rounds.push(await boot(p,1));rounds.push(await boot(p,2));
+    if(JSON.stringify(sourceTreeDigest(p))!==JSON.stringify(trees))C.fail('SOURCE_TREE_CHANGED');
     const receipt={planSHA256:p.planSHA256,zipSHA256:p.zipSHA256,status:'verified',rounds,databases,sourceTrees:trees,verifiedStateSHA256:sourceStateHash(p),hostSHA256:P.digest(p.host),requiresStartupValidation:false};
     guard.assertHeld();json(path.join(p.layout.state,'verification.json'),receipt,true);s=state(p);save(p,s,'verified');return receipt;
   }catch(e){s=state(p);s.error=e.code||'VERIFICATION_FAILED';save(p,s,'verification-failed');throw e;}

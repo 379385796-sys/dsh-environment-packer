@@ -79,20 +79,37 @@ function fixture(name,{unknown=false,liveCache=true,sources=true}={}){
 
   // ---- 2. Superseded cache backup: explicit exclusion, not silent ------------
   const bak=backup.manifest.coverage.excluded.find(i=>i.name==='.dshw-usage.json.before-recharge-fix.bak');
-  ok('a .bak of a captured runtime cache is explicitly excluded with its live file recorded',()=>{
-    assert(bak);assert.equal(bak.reason,'superseded-runtime-cache-backup');assert.equal(bak.needsReview,false);
-    assert.equal(bak.supersededBy,'.dshw-usage.json');
+  ok('historical .bak is captured outside runtime Home even with live data',()=>{
+    assert(bak);assert.equal(bak.reason,'captured-historical-data');assert.equal(bak.needsReview,false);
+    assert(backup.manifest.files.some(x=>x.path==='packages/home-history/'+bak.name));
+    assert.equal(backup.manifest.historicalData[0].activation,'archive-only');
     assert(backup.manifest.files.some(x=>x.path==='home-data/.dshw-usage.json'));
   });
   const noBase=fixture('v063-bak-only',{liveCache:false,sources:false}),noBaseZip=path.join(noBase.dir,'bak-only.zip');
   const noBaseBackup=await R.createBackup({...baseOptions(noBase),target:noBaseZip});
-  ok('a .bak without its live file is the only copy and stays a critical gap',()=>{
+  ok('historical .bak without live file is preserved as the only copy',()=>{
     const entry=noBaseBackup.manifest.coverage.excluded.find(i=>i.name==='.dshw-usage.json.before-recharge-fix.bak');
-    assert(entry);assert.equal(entry.reason,'unclassified-home-entry');assert.equal(entry.needsReview,true);
-    assert.equal(noBaseBackup.coverageSummary.state,'critical-gaps');
-    assert.equal(noBaseBackup.coverageSummary.recoveryBlocked,true);
+    assert(entry);assert.equal(entry.reason,'captured-historical-data');assert.equal(entry.needsReview,false);
+    assert.equal(noBaseBackup.coverageSummary.state,'no-known-critical-gaps');
+    assert.equal(noBaseBackup.coverageSummary.recoveryBlocked,false);
+    assert(noBaseBackup.manifest.files.some(x=>x.path==='packages/home-history/'+entry.name));
   });
 
+  const linked=fixture('v063-linked',{sources:false});
+  const outside=path.join(linked.dir,'outside');write(path.join(outside,'private.txt'),'must not traverse');
+  fs.mkdirSync(path.join(linked.home,'plugins-local'),{recursive:true});
+  fs.symlinkSync(outside,path.join(linked.home,'plugins-local/escape'),'junction');
+  const linkedBackup=await R.createBackup({...baseOptions(linked),target:path.join(linked.dir,'links.zip')});
+  ok('source junctions are refused without traversing external data; archive has critical gap',()=>{
+    assert(linkedBackup.manifest.coverage.missing.some(i=>i.code==='LOCAL_SOURCE_TREE_INCOMPLETE'&&i.critical));
+    assert.equal(linkedBackup.manifest.files.some(f=>f.path.includes('private.txt')),false);
+    assert.equal(linkedBackup.manifest.sourceTrees.length,0);
+  });
+  const wrongType=fixture('v063-wrongtype',{sources:false});write(path.join(wrongType.home,'plugins-local'),'not a directory');
+  const wrongBackup=await R.createBackup({...baseOptions(wrongType),target:path.join(wrongType.dir,'type.zip')});
+  ok('a file masquerading as source root produces a critical gap',()=>{
+    assert(wrongBackup.manifest.coverage.missing.some(i=>i.code==='LOCAL_SOURCE_TREE_INCOMPLETE'));
+  });
   // ---- 3. A clean fixture has no critical coverage gaps ----------------------
   const clean=fixture('v063-clean'),cleanZip=path.join(clean.dir,'clean.zip');
   const cleanBackup=await R.createBackup({...baseOptions(clean),target:cleanZip});
@@ -145,6 +162,16 @@ function fixture(name,{unknown=false,liveCache=true,sources=true}={}){
   rewrite(zip,badExclusion,m=>{m.sourceTrees[0].excluded=['notes.txt'];});
   ok('a source tree cannot declare a captured path segment as excluded',()=>{
     assert.throws(()=>{const a=R.readArchive(badExclusion);a.zip.close();},e=>e.code==='INVALID_MIGRATION_MANIFEST');
+  });
+  const unsafeTree=path.join(f.dir,'unsafe-tree.zip');
+  rewrite(zip,unsafeTree,m=>{m.sourceTrees=[{...m.sourceTrees[0],name:'storages',archivePrefix:'home-data/storages',restorePath:'storages',fileCount:0,bytes:0}];});
+  ok('sourceTrees cannot exempt runtime storages from safety scans',()=>{
+    assert.throws(()=>R.readArchive(unsafeTree),e=>e.code==='INVALID_MIGRATION_MANIFEST');
+  });
+  const emptyModules=path.join(f.dir,'empty-node-modules.zip');
+  rewrite(zip,emptyModules,m=>{m.directories.push('home-data/plugins-local/demo-plugin/NODE_MODULES');});
+  ok('excluded source directory names are enforced case insensitively even when empty',()=>{
+    assert.throws(()=>R.readArchive(emptyModules),e=>e.code==='INVALID_MIGRATION_MANIFEST');
   });
   const legacyShape=path.join(f.dir,'legacy-shape.zip');
   rewrite(cleanZip,legacyShape,m=>{delete m.sourceTrees;});

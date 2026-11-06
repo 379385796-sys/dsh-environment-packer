@@ -1,6 +1,6 @@
 # Build and test
 
-> **Current source: v0.6.3 candidate (published release: v0.6.2).** The `0.5.0` and v0.6.2 sections below are historical build records for those releases; the same isolated-workspace rules apply. The v0.6.3 section is at the end. Historical artefact hashes are deliberately kept unchanged.
+> **Current source: v0.6.3.** The `0.5.0` and v0.6.2 sections below are historical build records for those releases; the same isolated-workspace rules apply. The v0.6.3 section is at the end. Historical artefact hashes are deliberately kept unchanged.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 
@@ -74,13 +74,13 @@ Limits fail explicitly; no silent trimming. `C.ZipWriter` writes stored (uncompr
 
 ## v0.6.3 build, classification tests and limits
 
-Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Git worktree. Node used for these targeted runs: v22.22.2 (x64). The installed DSH Electron Node was not started this round.
+Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Git worktree. Node used for these targeted runs: v22.22.2 (x64). Codex final acceptance additionally ran test/v063-clean-path.cjs under the trusted installed DSH Electron Node with --expose-internals. Both isolated runtime rounds and commit passed.
 
 **Capacity limits are unchanged**: 128 MiB per file, 2 GiB total payload, 60,000 files + directories (`manifest.json` and directory headroom included), restore budget `payloadBytes × 3 + 128 MiB`. A per-tree entry/link/type failure becomes `LOCAL_SOURCE_TREE_INCOMPLETE`; whole-archive limits still fail explicitly, and no silent trimming occurs.
 
 **New targeted test**：
 
-- `test/v063-source-coverage.cjs` — 18 checks: `plugins-local` source capture with `node_modules` excluded; explicit `captured-local-plugin-source` classification; unrelated unknown Home entry still critical; `.bak` with and without its live file; clean coverage summary; deterministic Home-relative restore mapping; staged file/byte/digest; changed/missing staged tree refusal; manifest count tamper refusal; pre-0.6.3 archive without `sourceTrees` still readable; real `apply` staging and `verify` `SOURCE_TREE_CHANGED` gate (synthetic host evidence, no DSH start).
+- `test/v063-source-coverage.cjs` — 22 checks: `plugins-local` source capture with `node_modules` excluded; explicit `captured-local-plugin-source` classification; unrelated unknown Home entry still critical; `.bak` with and without its live file; clean coverage summary; deterministic Home-relative restore mapping; staged file/byte/digest; changed/missing staged tree refusal; manifest count tamper refusal; pre-0.6.3 archive without `sourceTrees` still readable; real `apply` staging and `verify` `SOURCE_TREE_CHANGED` gate (synthetic host evidence, no DSH start).
 
 **Extended targeted test**：
 
@@ -97,6 +97,6 @@ Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Gi
 | `test/client-bundle-test.mjs` | PASS |
 | `test/ui-overview-test.mjs` | PASS |
 
-All test roots, ZIPs and staged state were under `DSH_PACKER_TEST_ROOT`; no real Home, Profile, private ZIP, Mnemon store, credential or session body was read. `v062-clean-path.cjs` (two real isolated DSH runtime rounds) was **not** rerun this round and remains an explicit pre-release acceptance item; the source-tree change does not alter its dependency/host gate but adds staged data that must be exercised on the real runtime before release.
+All test roots, ZIPs and staged state were under DSH_PACKER_TEST_ROOT. Final acceptance added inspect → plan → apply → verify (two real isolated runtime rounds) → commit with an inert plugin entry that throws if activated, plus historical data preservation outside Home. No formal recovery was performed.
 
 **Candidate build**：`npm pack --ignore-scripts --json` into `candidate/v0.6.3/`, then assemble the standalone toolkit from the TGZ plus `Open-Recovery.ps1`, `READ-FIRST.txt` and `TOOLKIT-FILES.sha256`. `package/` content must match the candidate commit byte for byte; generated toolkit files are listed separately. Record SHA-256 values in `SHA256SUMS.txt`; do not embed the artifact's own hash inside itself. No formal install, GitHub Release, Market update, private ZIP overwrite or production restore is part of this build.

@@ -1,4 +1,4 @@
-# recovery/4 migration channel（current: v0.6.3 candidate）
+# recovery/4 migration channel（current: v0.6.3）
 
 This channel is independent of the unchanged `recovery/2` and `recovery/3` strict-restore implementation. Keep the complete tool directory and a trusted DSH installation. The assistant works without starting the ordinary DSH desktop first; target runtime inspection still requires its executable. No AI, download, installer, or installation lifecycle hook is used by recovery.
 
@@ -22,7 +22,7 @@ The engine performs `inspect → plan → apply → verify → commit / rollback
 
 **v0.6.3 capture classification**: `plugins-local` is treated as a local plugin **source** area, not a runtime data root. Its files are archived under `home-data/plugins-local/` with every `node_modules` directory excluded; the manifest records an optional `sourceTrees` entry with file count, bytes, exclusions and `complete`. The plan maps it to `<new Home>/plugins-local` with `activation: data-only`; `apply` records a staged file/byte/digest and `verify` recomputes it, failing with `SOURCE_TREE_CHANGED` on mismatch. Source trees are never parsed as plugins, storage, Sessions, databases or Skills, and are never activated or rewritten as configuration. A capture failure inside that tree becomes a critical `LOCAL_SOURCE_TREE_INCOMPLETE` gap instead of aborting the rest of the archive.
 
-A manual `.bak` is excluded only when it matches the known `.dshw-{usage,size,turn}.json.<qualifier>.bak` family **and** its live file exists as a regular file; it is recorded as `superseded-runtime-cache-backup` with `supersededBy`. Without the live file the backup may be the only copy and remains an unclassified critical gap. Unknown Home entries are unchanged: still critical, never silently excluded.
+Known `.dshw-{usage,size,turn}.json.<qualifier>.bak` snapshots are captured under `packages/home-history/` with optional `historicalData` metadata (`activation: archive-only`). Their live file is irrelevant: historical state cannot be reconstructed from current values. Recovery retains these files in transaction packages, outside runtime Home. Read/link/type failures remain critical gaps; unknown Home entries remain critical.
 
 The v0.6.2 dependency gate is unchanged. A recorded peer conflict such as `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0 / 3.18.5` is re-evaluated at restore and blocks `apply`/`commit`; optionality does not erase an installed-but-unsatisfied peer conflict.
 

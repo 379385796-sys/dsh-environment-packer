@@ -100,3 +100,10 @@ Baseline: tag `v0.6.2` (`e4acfd6a8d14cb2efe7c4741c8d668ed305f1c6f`), isolated Gi
 All test roots, ZIPs and staged state were under DSH_PACKER_TEST_ROOT. Final acceptance added inspect → plan → apply → verify (two real isolated runtime rounds) → commit with an inert plugin entry that throws if activated, plus historical data preservation outside Home. No formal recovery was performed.
 
 **Candidate build**：`npm pack --ignore-scripts --json` into `candidate/v0.6.3/`, then assemble the standalone toolkit from the TGZ plus `Open-Recovery.ps1`, `READ-FIRST.txt` and `TOOLKIT-FILES.sha256`. `package/` content must match the candidate commit byte for byte; generated toolkit files are listed separately. Record SHA-256 values in `SHA256SUMS.txt`; do not embed the artifact's own hash inside itself. No formal install, GitHub Release, Market update, private ZIP overwrite or production restore is part of this build.
+
+
+## v0.7.0 focused validation
+
+Set process TEMP/TMP, npm cache, pnpm store, browser profile and DSH_PACKER_TEST_ROOT explicitly in the D: workspace. Added `test/v070-browser-diagnostics.cjs` (seven positive/negative parser/source/read cases) and `test/v070-motion-test.ps1` (settled repaint, reduced motion, both palettes/eight states, bounds). `test/v070-legacy-runtime.cjs` generates an exact-DSH-ABI /2 fixture for WPF integration; set `DSH_PACKER_LEGACY_FIXTURE=wpf-legacy-state.json` when invoking restore-view-test.ps1. A standalone Node /2 fixture must continue to fail on a different Node ABI. The 43-case standalone legacy suite and exact-runtime WPF integration are distinct checks.
+
+Browser QA uses an independent synthetic host and fresh D: Edge profile. Text scaling is not OS DPI certification. Full synthetic /4 verification uses the trusted installed Electron Node with --expose-internals; formal tasks and private archives are excluded.

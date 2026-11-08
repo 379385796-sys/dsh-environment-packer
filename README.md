@@ -1,12 +1,18 @@
-# DSH Environment Packer · v0.6.3
+# DSH Environment Packer · v0.7.0
 
 **环境恢复包：为 DSH 创建私人冷备份，并在新路径、新兼容宿主上恢复环境。**
 
-[v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
+[v0.7.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0) · [English](README.en.md) · [迁移与兼容说明](docs/MIGRATION.md) · [恢复准备](docs/RECOVERY-PREPARATION.md) · [卸载与清理](docs/CLEANUP.md)
 
-> v0.6.3 的范围、验收与剩余边界见 [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md)。下载后请核对 `SHA256SUMS.txt`；保留旧版回退包与正式备份。
+> v0.7.0 的范围、验收与剩余边界见 [RELEASE-0.7.0.md](docs/RELEASE-0.7.0.md)。下载后请核对 `SHA256SUMS.txt`；保留旧版回退包与正式备份。
 
-## 最终验收说明（2026-11-07）
+## v0.7.0 技术精进与交互精修
+
+浏览器证明缺少解析器与源码语法不受支持现在有准确、有限的诊断；两者仍阻断恢复。设置页、冷备助手和恢复助手增加短时局部过渡、统一主操作色与焦点反馈，保留现有布局和全部安全门禁。动画不驱动任务进度，不逐帧改变窗口尺寸；支持减少动态效果。
+
+合成隔离恢复通过两轮真实 DSH 启停和 commit；私人业务恢复、完整真实插件组合、跨设备迁移、真实系统 DPI 与屏幕阅读器仍未认证。发布和 Market 状态以本版 Release 及目录实际状态为准。
+
+## 最终验收说明（2026-11-07） — v0.6.3 历史记录
 
 正式版本保持 **v0.6.3**，没有新增产品修复。独立复核确认：普通 Node 缺少 `--expose-internals` 会使浏览器消费者源码解析失败，被保守报告为 `HOST_BROWSER_PEER_UNPROVEN`；正式冷备、迁移助手和严格恢复助手已传入该标志。浏览器 peer 证明使用 Node 内部 Acorn，存在运行时兼容边界；能力缺失时仍阻断恢复，不能跳过证明。自编排 `plan/apply/verify/commit` 请遵守[运行时要求](docs/MIGRATION.md#runtime-requirement-for-browser-peer-proof)。
 
@@ -49,13 +55,13 @@
 
 ## 下载与安装
 
-**已发布版本**：从 [v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) 下载：
+**已发布版本**：从 [v0.7.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0) 下载：
 
 | 文件 | 用途 |
 |---|---|
-| `dsh-environment-packer-0.6.3.tgz` | DSH 插件安装包 |
-| `Packer-v0.6.3-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
-| `SHA256SUMS.txt` / 同名 `.sha256` | 下载校验值 |
+| `dsh-environment-packer-0.7.0.tgz` | DSH 插件安装包 |
+| `Packer-v0.7.0-Standalone-Recovery.zip` | 完整独立 Windows 恢复工具 |
+| `SHA256SUMS.txt` | 下载校验值 |
 
 安装与回退边界见 [UPGRADE-ROLLBACK.md](docs/UPGRADE-ROLLBACK.md)。DSH Market 的可用版本以合并状态为准。
 
@@ -65,7 +71,7 @@
 dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 ```
 
-升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 **0.6.3**。独立恢复工具请保留完整目录，不能只复制 EXE。
+升级已有 Profile 时沿用其原 pnpm store，不为更新 Packer 重装整个 Profile。重新启动后确认版本为 **0.7.0**。独立恢复工具请保留完整目录，不能只复制 EXE。
 
 ## 备份与恢复
 

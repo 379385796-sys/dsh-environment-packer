@@ -48,17 +48,25 @@ namespace PackerViews {
     }
   }
   public class RoundButton:Button {
-    private bool hover,pressed;
+    private bool pressed;
+    private LocalMotion hoverMotion;
+    public bool ReducedMotion {get{return hoverMotion.ReducedMotion;}set{hoverMotion.ReducedMotion=value;}}
     private string measuredText;private Font measuredFont;private int measuredWidth=-1,measuredDpi;private Size measuredSize;
     public bool Primary {get;set;} public Color Accent {get;set;} public Color OnAccent {get;set;}
     public Color LineColor {get;set;} public bool Quiet {get;set;}
     public Color Surface {get;set;} public Color HoverFill {get;set;} public Color PressedFill {get;set;}
     public Color DisabledFill {get;set;} public Color DisabledText {get;set;} public Color FocusColor {get;set;}
-    public RoundButton(){FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;DoubleBuffered=true;ResizeRedraw=true;AutoSize=true;Accent=Color.RoyalBlue;OnAccent=Color.White;LineColor=Color.Gainsboro;Padding=new Padding(12,8,12,8);Surface=Color.Empty;HoverFill=Color.Empty;PressedFill=Color.Empty;DisabledFill=Color.Empty;DisabledText=Color.Empty;FocusColor=Color.Empty;}
-    protected override void OnMouseEnter(EventArgs e){hover=true;Invalidate();base.OnMouseEnter(e);}
-    protected override void OnMouseLeave(EventArgs e){hover=false;pressed=false;Invalidate();base.OnMouseLeave(e);}
+    public RoundButton(){hoverMotion=new LocalMotion(this);FlatStyle=FlatStyle.Flat;FlatAppearance.BorderSize=0;DoubleBuffered=true;ResizeRedraw=true;AutoSize=true;Accent=Color.RoyalBlue;OnAccent=Color.White;LineColor=Color.Gainsboro;Padding=new Padding(12,8,12,8);Surface=Color.Empty;HoverFill=Color.Empty;PressedFill=Color.Empty;DisabledFill=Color.Empty;DisabledText=Color.Empty;FocusColor=Color.Empty;}
+    protected override void OnMouseEnter(EventArgs e){hoverMotion.To(1,140);base.OnMouseEnter(e);}
+    protected override void OnMouseLeave(EventArgs e){pressed=false;hoverMotion.To(0,140);base.OnMouseLeave(e);}
     protected override void OnMouseDown(MouseEventArgs e){pressed=true;Invalidate();base.OnMouseDown(e);}
     protected override void OnMouseUp(MouseEventArgs e){pressed=false;Invalidate();base.OnMouseUp(e);}
+    protected override void OnGotFocus(EventArgs e){base.OnGotFocus(e);Invalidate();}
+    protected override void OnLostFocus(EventArgs e){pressed=false;base.OnLostFocus(e);Invalidate();}
+    protected override void OnKeyDown(KeyEventArgs e){if(e.KeyCode==Keys.Space){pressed=true;Invalidate();}base.OnKeyDown(e);}
+    protected override void OnKeyUp(KeyEventArgs e){pressed=false;Invalidate();base.OnKeyUp(e);}
+    protected override void OnEnabledChanged(EventArgs e){pressed=false;if(hoverMotion!=null)hoverMotion.To(0,0);base.OnEnabledChanged(e);}
+    protected override void Dispose(bool disposing){if(disposing&&hoverMotion!=null)hoverMotion.Dispose();base.Dispose(disposing);}
     public override Size GetPreferredSize(Size proposed){
       int max=MaximumSize.Width>0?MaximumSize.Width:1600;
       if(measuredWidth==max&&measuredDpi==DeviceDpi&&measuredText==Text&&Object.ReferenceEquals(measuredFont,Font))return measuredSize;
@@ -72,7 +80,7 @@ namespace PackerViews {
       Color fill=Primary?Accent:(Quiet?parent:(Surface!=Color.Empty?Surface:BackColor)),fg=Primary?OnAccent:ForeColor;
       if(!Enabled){fill=DisabledFill!=Color.Empty?DisabledFill:BackColor;fg=DisabledText!=Color.Empty?DisabledText:SystemColors.GrayText;}
       else if(pressed){fill=PressedFill!=Color.Empty?PressedFill:DrawingTools.Blend(fill,Primary?OnAccent:ForeColor,.16f);}
-      else if(hover){fill=HoverFill!=Color.Empty?HoverFill:DrawingTools.Blend(fill,Primary?OnAccent:ForeColor,.07f);}
+      else if(hoverMotion.Value>0){Color over=HoverFill!=Color.Empty?HoverFill:DrawingTools.Blend(fill,Primary?OnAccent:ForeColor,.07f);fill=DrawingTools.Blend(fill,over,hoverMotion.Value);}
       using(GraphicsPath p=DrawingTools.Round(new RectangleF(.5f,.5f,Math.Max(1,Width-1),Math.Max(1,Height-1)),8*Font.Height/17f)){
         using(Brush b=new SolidBrush(fill))e.Graphics.FillPath(b,p);
         if(!Quiet&&!Primary)using(Pen pen=new Pen(LineColor))e.Graphics.DrawPath(pen,p);
@@ -85,11 +93,14 @@ namespace PackerViews {
     }
   }
   public class WizardSteps:Control {
-    public int Active {get;set;} public bool Complete {get;set;} public bool FailureKnown {get;set;}
+    private int active=-1;private bool complete;private LocalMotion stateMotion;
+    public bool ReducedMotion {get{return stateMotion.ReducedMotion;}set{stateMotion.ReducedMotion=value;}}
+    public int Active {get{return active;}set{if(active==value)return;active=value;if(stateMotion!=null){stateMotion.Snap(0);stateMotion.To(1,180);}Invalidate();}}
+    public bool Complete {get{return complete;}set{if(complete==value)return;complete=value;if(stateMotion!=null){stateMotion.Snap(0);stateMotion.To(1,180);}Invalidate();}} public bool FailureKnown {get;set;}
     public Color Accent {get;set;} public Color Muted {get;set;} public Color LineColor {get;set;}
     public Color SoftAccent {get;set;} public Color ErrorColor {get;set;} public Color OnAccent {get;set;}
     private string[] names={"退出 DSH","环境检查","文件打包","完整性校验","完成"};
-    public WizardSteps(){DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Active=-1;Height=58;AccessibleRole=AccessibleRole.Grouping;OnAccent=Color.White;}
+    public WizardSteps(){stateMotion=new LocalMotion(this);stateMotion.Snap(1);DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Active=-1;Height=58;AccessibleRole=AccessibleRole.Grouping;OnAccent=Color.White;}
     protected override void OnPaint(PaintEventArgs e){
       base.OnPaint(e);Graphics g=e.Graphics;g.Clear(BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
       float cell=ClientSize.Width/5f,d=Math.Max(22,Font.Height*1.32f),cy=d/2+4;
@@ -97,21 +108,25 @@ namespace PackerViews {
         float x=cell*(i+.5f);bool done=Complete||(Active>=0&&i<Active),active=i==Active;
         if(i<4)using(Pen p=new Pen(done?DrawingTools.Blend(LineColor,Accent,.5f):LineColor,2)){p.StartCap=p.EndCap=LineCap.Round;g.DrawLine(p,x+d/2+7,cy,x+cell-d/2-7,cy);}
         Color color=active&&FailureKnown?ErrorColor:active||done?Accent:Muted;
-        if(active)using(Brush halo=new SolidBrush(SoftAccent))g.FillEllipse(halo,x-d/2-4,cy-d/2-4,d+8,d+8);
+        if(active)using(Brush halo=new SolidBrush(DrawingTools.Blend(BackColor,SoftAccent,stateMotion.Value)))g.FillEllipse(halo,x-d/2-4,cy-d/2-4,d+8,d+8);
         using(Brush b=new SolidBrush(active?(FailureKnown?ErrorColor:Accent):done?SoftAccent:BackColor))g.FillEllipse(b,x-d/2,cy-d/2,d,d);
         if(!active&&!done)using(Pen p=new Pen(LineColor))g.DrawEllipse(p,x-d/2,cy-d/2,d,d);
-        if(done){using(Pen p=new Pen(Accent,1.7f))g.DrawLines(p,new PointF[]{new PointF(x-5,cy),new PointF(x-1,cy+4),new PointF(x+6,cy-4)});}
+        if(done){using(Pen p=new Pen(active?OnAccent:Accent,1.7f))g.DrawLines(p,new PointF[]{new PointF(x-5,cy),new PointF(x-1,cy+4),new PointF(x+6,cy-4)});}
         else TextRenderer.DrawText(g,active&&FailureKnown?"!":(i+1).ToString(),Font,new Rectangle((int)(x-d/2),(int)(cy-d/2),(int)d,(int)d),active?OnAccent:color,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter);
         TextRenderer.DrawText(g,names[i],Font,new Rectangle((int)(cell*i),(int)(cy+d/2+5),(int)cell,Math.Max(1,Height-(int)(cy+d/2+5))),color,TextFormatFlags.HorizontalCenter|TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix);
       }
     }
+    protected override void Dispose(bool disposing){if(disposing&&stateMotion!=null)stateMotion.Dispose();base.Dispose(disposing);}
   }
   public class PhaseGlyph:Control {
-    public string Kind {get;set;} public Color Tint {get;set;} public Color SoftTint {get;set;}
-    public PhaseGlyph(){DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Size=new Size(44,44);Kind="waiting";}
+    protected override void Dispose(bool disposing){if(disposing&&stateMotion!=null)stateMotion.Dispose();base.Dispose(disposing);}
+    private string kind;private LocalMotion stateMotion;
+    public bool ReducedMotion {get{return stateMotion.ReducedMotion;}set{stateMotion.ReducedMotion=value;}}
+    public string Kind {get{return kind;}set{if(kind==value)return;kind=value;if(stateMotion!=null){stateMotion.Snap(0);stateMotion.To(1,180);}Invalidate();}} public Color Tint {get;set;} public Color SoftTint {get;set;}
+    public PhaseGlyph(){stateMotion=new LocalMotion(this);DoubleBuffered=true;ResizeRedraw=true;TabStop=false;Size=new Size(44,44);Kind="waiting";}
     protected override void OnPaint(PaintEventArgs e){
       Graphics g=e.Graphics;GraphicsState saved=g.Save();try{g.Clear(Parent.BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
-      using(GraphicsPath bg=DrawingTools.Round(new RectangleF(0,0,Width,Height),12))using(Brush b=new SolidBrush(SoftTint))g.FillPath(b,bg);
+      using(GraphicsPath bg=DrawingTools.Round(new RectangleF(0,0,Width,Height),12))using(Brush b=new SolidBrush(DrawingTools.Blend(Parent.BackColor,SoftTint,stateMotion.Value)))g.FillPath(b,bg);
       float scale=Math.Min(Width,Height)/52f;g.TranslateTransform((Width-26*scale)/2,(Height-26*scale)/2);g.ScaleTransform(scale,scale);
       using(Pen p=new Pen(Tint,1.7f)){
         if(Kind=="success")g.DrawLines(p,new Point[]{new Point(4,13),new Point(10,19),new Point(23,5)});
@@ -129,8 +144,8 @@ namespace PackerViews {
     public ProgressBarStyle Style{get{return style;}set{if(style==value)return;style=value;Pulse();Invalidate();}}
     public int MarqueeAnimationSpeed{get{return speed;}set{if(speed==value)return;speed=value;Pulse();}}
     public int Value{get{return value;}set{int next=Math.Max(0,Math.Min(100,value));if(this.value==next)return;this.value=next;Invalidate();}}
-    public PhaseProgress(){DoubleBuffered=true;ResizeRedraw=true;Height=5;TabStop=false;AccessibleRole=AccessibleRole.ProgressBar;style=ProgressBarStyle.Marquee;timer=new Timer();timer.Interval=45;timer.Tick+=delegate{offset+=.022f;if(offset>1.35f)offset=0;Invalidate();};}
-    private void Pulse(){if(timer!=null)timer.Enabled=speed>0&&style==ProgressBarStyle.Marquee&&Visible&&SystemInformation.UIEffectsEnabled;}
+    public PhaseProgress(){DoubleBuffered=true;ResizeRedraw=true;Height=5;TabStop=false;AccessibleRole=AccessibleRole.ProgressBar;style=ProgressBarStyle.Marquee;timer=new Timer();timer.Interval=45;timer.Tick+=delegate{if(!LocalMotion.Allowed){Pulse();Invalidate();return;}offset+=.022f;if(offset>1.35f)offset=0;Invalidate();};}
+    private void Pulse(){if(timer!=null)timer.Enabled=speed>0&&style==ProgressBarStyle.Marquee&&Visible&&LocalMotion.Allowed;}
     protected override void OnVisibleChanged(EventArgs e){base.OnVisibleChanged(e);Pulse();}
     protected override void OnPaint(PaintEventArgs e){Graphics g=e.Graphics;g.Clear(Parent.BackColor);g.SmoothingMode=SmoothingMode.AntiAlias;
       using(GraphicsPath p=DrawingTools.Round(new RectangleF(0,0,Width,Height),2.5f))using(Brush b=new SolidBrush(Track))g.FillPath(b,p);
@@ -342,10 +357,10 @@ function New-PackerAssistantView([string]$Target) {
     try{
       $dark=$theme.SelectedIndex -eq 2
       if($theme.SelectedIndex -eq 0){$setting=Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name AppsUseLightTheme -ErrorAction SilentlyContinue;$dark=$null -ne $setting -and $setting.AppsUseLightTheme -eq 0}
-      $themeKey=@($dark,[Windows.Forms.SystemInformation]::HighContrast,[Windows.Forms.SystemInformation]::UIEffectsEnabled) -join '|'
+      $themeKey=@($dark,[Windows.Forms.SystemInformation]::HighContrast,[PackerViews.LocalMotion]::Allowed) -join '|'
       if($view.ThemeKey -ceq $themeKey){return}
-      $p=@{Bg=[Drawing.Color]::FromArgb(246,248,251);Layer=[Drawing.Color]::FromArgb(255,255,255);Inset=[Drawing.Color]::FromArgb(243,246,250);Text=[Drawing.Color]::FromArgb(27,30,36);Muted=[Drawing.Color]::FromArgb(91,99,112);Line=[Drawing.Color]::FromArgb(220,225,233);Accent=[Drawing.Color]::FromArgb(15,108,189);AccentHover=[Drawing.Color]::FromArgb(17,94,163);AccentPressed=[Drawing.Color]::FromArgb(13,79,140);Soft=[Drawing.Color]::FromArgb(229,241,251);OnAccent=[Drawing.Color]::White;Error=[Drawing.Color]::FromArgb(196,43,28);SoftError=[Drawing.Color]::FromArgb(253,231,233);Success=[Drawing.Color]::FromArgb(15,123,15);SoftSuccess=[Drawing.Color]::FromArgb(223,246,221);Warn=[Drawing.Color]::FromArgb(138,83,0);SoftWarn=[Drawing.Color]::FromArgb(255,244,206);WarnBorder=[Drawing.Color]::FromArgb(232,195,106);WarnText=[Drawing.Color]::FromArgb(107,78,0);Disabled=[Drawing.Color]::FromArgb(232,235,240);DisabledText=[Drawing.Color]::FromArgb(118,126,138);Focus=[Drawing.Color]::FromArgb(15,108,189)}
-      if($dark){$p=@{Bg=[Drawing.Color]::FromArgb(24,26,31);Layer=[Drawing.Color]::FromArgb(32,35,41);Inset=[Drawing.Color]::FromArgb(27,30,36);Text=[Drawing.Color]::FromArgb(235,237,242);Muted=[Drawing.Color]::FromArgb(166,173,185);Line=[Drawing.Color]::FromArgb(56,61,72);Accent=[Drawing.Color]::FromArgb(145,170,255);AccentHover=[Drawing.Color]::FromArgb(163,185,255);AccentPressed=[Drawing.Color]::FromArgb(128,153,240);Soft=[Drawing.Color]::FromArgb(40,50,74);OnAccent=[Drawing.Color]::FromArgb(20,30,55);Error=[Drawing.Color]::FromArgb(243,151,160);SoftError=[Drawing.Color]::FromArgb(61,41,47);Success=[Drawing.Color]::FromArgb(123,203,170);SoftSuccess=[Drawing.Color]::FromArgb(37,58,50);Warn=[Drawing.Color]::FromArgb(242,198,97);SoftWarn=[Drawing.Color]::FromArgb(58,46,20);WarnBorder=[Drawing.Color]::FromArgb(107,85,34);WarnText=[Drawing.Color]::FromArgb(247,217,139);Disabled=[Drawing.Color]::FromArgb(45,49,58);DisabledText=[Drawing.Color]::FromArgb(140,148,162);Focus=[Drawing.Color]::FromArgb(145,170,255)}}
+      $p=@{Bg=[Drawing.Color]::FromArgb(246,248,251);Layer=[Drawing.Color]::FromArgb(255,255,255);Inset=[Drawing.Color]::FromArgb(243,246,250);Text=[Drawing.Color]::FromArgb(27,30,36);Muted=[Drawing.Color]::FromArgb(91,99,112);Line=[Drawing.Color]::FromArgb(220,225,233);Accent=[Drawing.Color]::FromArgb(77,107,254);AccentHover=[Drawing.Color]::FromArgb(17,94,163);AccentPressed=[Drawing.Color]::FromArgb(13,79,140);Soft=[Drawing.Color]::FromArgb(229,241,251);OnAccent=[Drawing.Color]::White;Error=[Drawing.Color]::FromArgb(196,43,28);SoftError=[Drawing.Color]::FromArgb(253,231,233);Success=[Drawing.Color]::FromArgb(15,123,15);SoftSuccess=[Drawing.Color]::FromArgb(223,246,221);Warn=[Drawing.Color]::FromArgb(138,83,0);SoftWarn=[Drawing.Color]::FromArgb(255,244,206);WarnBorder=[Drawing.Color]::FromArgb(232,195,106);WarnText=[Drawing.Color]::FromArgb(107,78,0);Disabled=[Drawing.Color]::FromArgb(232,235,240);DisabledText=[Drawing.Color]::FromArgb(118,126,138);Focus=[Drawing.Color]::FromArgb(77,107,254)}
+      if($dark){$p=@{Bg=[Drawing.Color]::FromArgb(24,26,31);Layer=[Drawing.Color]::FromArgb(32,35,41);Inset=[Drawing.Color]::FromArgb(27,30,36);Text=[Drawing.Color]::FromArgb(235,237,242);Muted=[Drawing.Color]::FromArgb(166,173,185);Line=[Drawing.Color]::FromArgb(56,61,72);Accent=[Drawing.Color]::FromArgb(154,174,255);AccentHover=[Drawing.Color]::FromArgb(163,185,255);AccentPressed=[Drawing.Color]::FromArgb(128,153,240);Soft=[Drawing.Color]::FromArgb(40,50,74);OnAccent=[Drawing.Color]::FromArgb(20,30,55);Error=[Drawing.Color]::FromArgb(243,151,160);SoftError=[Drawing.Color]::FromArgb(61,41,47);Success=[Drawing.Color]::FromArgb(123,203,170);SoftSuccess=[Drawing.Color]::FromArgb(37,58,50);Warn=[Drawing.Color]::FromArgb(242,198,97);SoftWarn=[Drawing.Color]::FromArgb(58,46,20);WarnBorder=[Drawing.Color]::FromArgb(107,85,34);WarnText=[Drawing.Color]::FromArgb(247,217,139);Disabled=[Drawing.Color]::FromArgb(45,49,58);DisabledText=[Drawing.Color]::FromArgb(140,148,162);Focus=[Drawing.Color]::FromArgb(145,170,255)}}
       if([Windows.Forms.SystemInformation]::HighContrast){$p.Bg=[Drawing.SystemColors]::Window;$p.Layer=$p.Bg;$p.Inset=$p.Bg;$p.Text=[Drawing.SystemColors]::WindowText;$p.Muted=$p.Text;$p.Line=$p.Text;$p.Accent=[Drawing.SystemColors]::Highlight;$p.AccentHover=$p.Accent;$p.AccentPressed=$p.Accent;$p.OnAccent=[Drawing.SystemColors]::HighlightText;$p.Soft=$p.Bg;$p.Error=$p.Text;$p.SoftError=$p.Bg;$p.Success=$p.Text;$p.SoftSuccess=$p.Bg;$p.Warn=$p.Text;$p.SoftWarn=$p.Bg;$p.WarnBorder=$p.Line;$p.WarnText=$p.Text;$p.Disabled=$p.Bg;$p.DisabledText=$p.Text;$p.Focus=[Drawing.SystemColors]::Highlight}
       $view.Palette=$p;$view.Dark=$dark;$form.BackColor=$p.Bg;$form.ForeColor=$p.Text;$form.CaptionText=$p.Text;$form.SetDarkChrome($dark)
       $viewport.BackColor=$p.Bg;$root.BackColor=$p.Bg;$header.BackColor=$p.Bg;$footer.BackColor=$p.Bg;$secondaryGroup.BackColor=$p.Bg;$actions.BackColor=$p.Bg;$countGroup.BackColor=$p.Layer
@@ -364,7 +379,7 @@ function New-PackerAssistantView([string]$Target) {
       $steps.Accent=$p.Accent;$steps.Muted=$p.Muted;$steps.LineColor=$p.Line;$steps.SoftAccent=$p.Soft;$steps.ErrorColor=$p.Error;$steps.OnAccent=$p.OnAccent
       $progress.Accent=$p.Accent;$progress.Track=$p.Line
       $logScroll.BackColor=$p.Layer;$logScroll.ThumbColor=$p.Muted;$logScroll.TrackColor=$p.Layer
-      $progress.MarqueeAnimationSpeed=if([Windows.Forms.SystemInformation]::UIEffectsEnabled){30}else{0}
+      $progress.MarqueeAnimationSpeed=if([PackerViews.LocalMotion]::Allowed){30}else{0}
       & $view.PaintPhase
       $glyph.Invalidate();$steps.Invalidate();$statusPill.Invalidate();$summary.Invalidate();$saveCard.Invalidate();$resultCard.Invalidate()
       $view.ThemeKey=$themeKey

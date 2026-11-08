@@ -63,3 +63,8 @@ Windows x64 `0.2.1-rc.5` to `0.2.2-rc.1` has been exercised with isolated synthe
 Session v4 Zstandard decoding consumes all concatenated frames, bounds total expanded bytes and refuses corrupt later frames. Conversion writes a standalone header frame followed by event frames. Verification now opens every declared session through the target persistence service and reads its events before commit; file hashes or startup alone cannot replace this check. Preference bootstrap verification uses the actual authenticated HTTP page and the bound plan ID, preserving compatibility with rc.1's request-dependent webserver API. Unknown `.db`, `.sqlite` and `.sqlite3` files remain critical; a SQLite header is not owner/schema compatibility proof.
 
 The original rc.5 ZIP remains readable without changes. Archives with unknown SQLite can be inspected/staged for diagnosis but cannot verify/commit as a complete recovery. Native Mnemon owner migration on rc.1 and other real plugins remain unverified; no fake owner, version exemption or edited host proof is used to clear them. The candidate and evidence do not authorize writing the formal Home, Workspace, Profile, application installation or store.
+
+
+## v0.7.0 diagnostic detail
+
+`HOST_BROWSER_PEER_UNPROVEN` remains a blocking proof failure. `reason=browser-parser-unavailable` specifically means the inspecting process could not load the required parser; use the shipped assistant or `--expose-internals`. `consumer-source-syntax-invalid` means parsing was attempted and failed. Neither diagnosis authorizes bypassing proof. Other source/read errors retain `consumer-source-unproven`. Raw parser error text and source are not projected into the settings overview. Archive formats and transaction gates are unchanged.

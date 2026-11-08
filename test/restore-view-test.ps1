@@ -44,7 +44,8 @@ try{
   if((ConvertTo-PackerProcessArgument 'D:\space path\') -ne '"D:\space path\\"' -or (ConvertTo-PackerProcessArgument 'a"b') -ne '"a\"b"'){throw 'Worker quoting failed'}
   $checks.Add('Worker argv preserves spaces, quotes and trailing slashes')
 }finally{$view.form.Close()}
-$state=Get-Content -LiteralPath (Join-Path $TestRoot 'acceptance-state.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$fixtureName=if($env:DSH_PACKER_LEGACY_FIXTURE){$env:DSH_PACKER_LEGACY_FIXTURE}else{'acceptance-state.json'}
+$state=Get-Content -LiteralPath (Join-Path $TestRoot $fixtureName) -Raw -Encoding UTF8 | ConvertFrom-Json
 $driver=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\bin\restore-assistant.ps1') -Raw -Encoding UTF8
 $entry=$driver.IndexOf('try{$timer.Start();Update-Gate;[void]$view.form.ShowDialog()}');if($entry -lt 0){throw 'Controller entry changed'}
 $bin=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\bin'))

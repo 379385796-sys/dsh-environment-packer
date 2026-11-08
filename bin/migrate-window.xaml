@@ -17,7 +17,7 @@
     <SolidColorBrush x:Key="Ink" Color="#17191D"/>
     <SolidColorBrush x:Key="Muted" Color="#717680"/>
     <SolidColorBrush x:Key="Line" Color="#DFE5EE"/>
-    <SolidColorBrush x:Key="Accent" Color="#17191D"/>
+    <SolidColorBrush x:Key="Accent" Color="#4D6BFE"/>
     <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Focus" Color="#5175D6"/>
     <SolidColorBrush x:Key="Success" Color="#28765B"/>
@@ -37,7 +37,7 @@
         <ControlTemplate.Triggers>
           <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.78"/></Trigger>
           <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.6"/></Trigger>
-          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Focus}"/><Setter TargetName="Surface" Property="BorderThickness" Value="2"/></Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource Focus}"/></Trigger>
           <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.36"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>

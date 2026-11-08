@@ -1,3 +1,9 @@
+# v0.7.0 Motion and visual refinement
+
+Keep the three settings tabs and independent assistants. Prefer inherited DSH fonts, semantic surfaces, a consistent blue accent, quiet cards and visible keyboard focus. Durations: 140ms interaction color; 180ms page/detail/state entry; no layout or window-bound interpolation. Native finite timers stop after settling, when hidden/disposed, in high contrast or when UI/client-area animation is disabled. CSS reduced motion includes pseudo-elements. Press feedback and safety gates are immediate. Marquee is indeterminate, not an estimate. Native step/glyph feedback follows recorded state only. Repeated identical state polls do not restart entry effects.
+
+The browser matrix uses a synthetic host, two widths, light/dark themes and 150%/200% text scaling; real OS DPI and screen-reader acceptance remain separate.
+
 # 独立助手 UI 设计记录
 
 > **v0.6.3 不改 UI**：本版只调整归档覆盖分类、源码树恢复映射与验证回执，不改页面结构、控件、配色、布局、DPI 或焦点行为。以下 v0.6.2 文案与语义修正仍然有效：成功页在有已知关键覆盖缺口时显示「归档完成；恢复受阻」并列出稳定缺口码；无目标检查不宣称兼容成功；旧记录缺摘要按未知处理；`ui-result.json` 写入失败时四种终态都不再显示「结果已保留」。

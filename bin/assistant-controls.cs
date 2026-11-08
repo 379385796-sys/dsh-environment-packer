@@ -1,5 +1,30 @@
 // Presentation only. Native numeric validation and popup keyboard handling remain in WinForms.
 namespace PackerViews {
+  // A finite, local repaint only. Never animates window bounds or task state.
+  public sealed class LocalMotion:System.IDisposable {
+    [System.Runtime.InteropServices.DllImport("user32.dll",SetLastError=true)]
+    private static extern bool SystemParametersInfo(uint action,uint param,[System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)] out bool enabled,uint flags);
+    public static bool Allowed {get{bool enabled;return SystemInformation.UIEffectsEnabled&&!SystemInformation.HighContrast&&SystemParametersInfo(0x1042,0,out enabled,0)&&enabled;}}
+    private Control owner;private Timer timer;private System.Diagnostics.Stopwatch clock=new System.Diagnostics.Stopwatch();
+    private float start,target;private int duration;private bool reduced;
+    public float Value {get;private set;}
+    public bool Running {get{return timer.Enabled;}}
+    public bool ReducedMotion {get{return reduced;}set{reduced=value;if(value)Snap(target);}}
+    public LocalMotion(Control control){owner=control;timer=new Timer{Interval=16};timer.Tick+=Tick;owner.VisibleChanged+=VisibilityChanged;}
+    public void Snap(float value){timer.Stop();clock.Stop();Value=target=value;owner.Invalidate();}
+    public void To(float value,int milliseconds){
+      if(value==target&&timer.Enabled)return;
+      start=Value;target=value;duration=milliseconds;
+      if(reduced||!Allowed||!owner.Visible||!owner.IsHandleCreated||milliseconds<=0||start==target){Snap(target);return;}
+      clock.Restart();timer.Start();
+    }
+    private void Tick(object sender,EventArgs e){
+      if(reduced||!Allowed||!owner.Visible){Snap(target);return;}
+      float t=Math.Min(1,(float)clock.Elapsed.TotalMilliseconds/duration);float eased=1-(1-t)*(1-t)*(1-t);Value=start+(target-start)*eased;owner.Invalidate();if(t>=1){timer.Stop();clock.Stop();}
+    }
+    private void VisibilityChanged(object sender,EventArgs e){if(!owner.Visible)Snap(target);}
+    public void Dispose(){owner.VisibleChanged-=VisibilityChanged;timer.Dispose();clock.Stop();}
+  }
   public class RoundSettingsBar:FlowLayoutPanel {
     public Color LineColor{get;set;}
     public RoundSettingsBar(){DoubleBuffered=true;ResizeRedraw=true;LineColor=Color.Gainsboro;}

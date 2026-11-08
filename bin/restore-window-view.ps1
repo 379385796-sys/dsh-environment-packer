@@ -15,9 +15,10 @@ function New-PackerRestoreView([string]$XamlFile='restore-window.xaml') {
   if($view.IsMigration){foreach($key in 'PlanSummary','PlanDetails','Usability'){$view[$key]=$window.FindName($key)}}
   # Read-only system palette selection; no preference or global setting is written.
   $dark=$false;try{$pref=Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name AppsUseLightTheme -ErrorAction Stop;$dark=$pref.AppsUseLightTheme -eq 0}catch{}
-  if($dark){foreach($item in @{Canvas='#20242C';Surface='#292E38';Layer='#242933';Soft='#343D4B';Ink='#F0F1F3';Muted='#A7ADB7';Line='#404957';Accent='#ECEEF2';OnAccent='#202124';Focus='#9BB5FF';Success='#86C8AC';Error='#F3A1A4';WarningBg='#353027'}.GetEnumerator()){$window.Resources[$item.Key]=New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString($item.Value))}}
+  if($dark){foreach($item in @{Canvas='#20242C';Surface='#292E38';Layer='#242933';Soft='#343D4B';Ink='#F0F1F3';Muted='#A7ADB7';Line='#404957';Accent='#9AAEFF';OnAccent='#141E37';Focus='#9BB5FF';Success='#86C8AC';Error='#F3A1A4';WarningBg='#353027'}.GetEnumerator()){$window.Resources[$item.Key]=New-Object Windows.Media.SolidColorBrush([Windows.Media.ColorConverter]::ConvertFromString($item.Value))}}
   if([Windows.SystemParameters]::HighContrast){foreach($item in @{Canvas=[Windows.SystemColors]::WindowColor;Surface=[Windows.SystemColors]::WindowColor;Success=[Windows.SystemColors]::WindowTextColor;Error=[Windows.SystemColors]::WindowTextColor;Layer=[Windows.SystemColors]::WindowColor;Soft=[Windows.SystemColors]::ControlColor;Ink=[Windows.SystemColors]::WindowTextColor;Muted=[Windows.SystemColors]::WindowTextColor;Line=[Windows.SystemColors]::WindowTextColor;Accent=[Windows.SystemColors]::HighlightColor;OnAccent=[Windows.SystemColors]::HighlightTextColor;Focus=[Windows.SystemColors]::HighlightColor;WarningBg=[Windows.SystemColors]::WindowColor}.GetEnumerator()){$window.Resources[$item.Key]=New-Object Windows.Media.SolidColorBrush($item.Value)}}
   $view.ShowPage={param([int]$Page)
+    $changed=$view.page -ne $Page
     $view.page=$Page
     for($i=0;$i -lt 3;$i++){$pages[$i].Visibility=if($i -eq $Page){'Visible'}else{'Collapsed'};@($view.stepBackup,$view.stepTarget,$view.stepResult)[$i].Background=$window.FindResource($(if($i -eq $Page){'Soft'}else{'Layer'}))}
     $view.heading.Text=@('准备备份文件与 DSH 程序','选择新环境的保存位置','恢复进度与结果')[$Page]
@@ -26,6 +27,14 @@ function New-PackerRestoreView([string]$XamlFile='restore-window.xaml') {
     $view.next.Visibility=if($Page -eq 0){'Visible'}else{'Collapsed'};$view.restore.Visibility=if($Page -eq 1){'Visible'}else{'Collapsed'};$view.back.Visibility=if($Page -gt 0){'Visible'}else{'Collapsed'}
     $view.confirm.Visibility=if($Page -eq 1){'Visible'}else{'Collapsed'}
     $view.scroll.ScrollToTop()
+    # Animate only a changed page, never the window, polling loop or safety gate.
+    $pageControl=$pages[$Page]
+    $pageControl.BeginAnimation([Windows.UIElement]::OpacityProperty,$null)
+    if($changed -and [Windows.SystemParameters]::ClientAreaAnimation -and -not [Windows.SystemParameters]::HighContrast){
+      $fade=New-Object Windows.Media.Animation.DoubleAnimation
+      $fade.From=.88;$fade.To=1;$fade.Duration=New-Object Windows.Duration([TimeSpan]::FromMilliseconds(180));$fade.FillBehavior='Stop'
+      $pageControl.BeginAnimation([Windows.UIElement]::OpacityProperty,$fade)
+    }
   }.GetNewClosure()
   $goTarget={if(-not $view.Busy -and $view.stepTarget.IsEnabled){$view.selection.Text=[IO.Path]::GetFileName($view.zip.Text)+[Environment]::NewLine+'ZIP：'+$view.zip.Text+[Environment]::NewLine+'运行时：'+$view.runtime.Text;& $view.ShowPage 1;[void]$view.target.Focus()}}.GetNewClosure()
   $view.next.Add_Click($goTarget);$view.stepTarget.Add_Click($goTarget)

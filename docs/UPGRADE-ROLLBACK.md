@@ -1,8 +1,12 @@
 # Upgrade and rollback
 
-> **Current source: v0.6.3.** The sections below are historical procedures for 0.5.0, 0.4.2 and 0.6.2; keep them for provenance but use the v0.6.3 notes first.
+> **Current source: v0.7.0.** The sections below are historical procedures for 0.5.0, 0.4.2 and 0.6.2; keep them for provenance but use the v0.7.0 notes first.
 
-## v0.6.3 upgrade / rollback notes
+## v0.7.0 upgrade / rollback notes
+
+Keep the verified v0.6.3 TGZ, installed package/config/lock snapshots and private archives. Wait for active DSH work to finish, exit normally, then use the existing official offline CLI with `--offline --ignore-scripts` and the existing Profile store. Verify only Packer changed and check startup/settings. No production restore is part of an upgrade. To roll back, normally exit DSH and install the retained v0.6.3 TGZ through the same path; verify package files and unrelated plugin/config invariance. Never copy an old lockfile over concurrent unrelated changes. No archive schema migration is required.
+
+## v0.6.3 upgrade / rollback notes (historical)
 
 - Keep v0.6.2 attachments, installed-package rollback material and formal backups untouched. Verify v0.6.3 hashes before using the normal offline install path.
 - Upgrade path is unchanged: normally exit every DSH instance, keep the existing Profile pnpm store, and install the verified TGZ through the official offline plugin path (`dsh plugin --profile desktop add <TGZ> --offline --ignore-scripts`).

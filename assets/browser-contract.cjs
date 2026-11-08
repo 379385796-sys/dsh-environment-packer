@@ -2,7 +2,13 @@
 // Reuse the parser in the pinned Node executable; never evaluate Profile code.
 const path=require('node:path').posix,crypto=require('node:crypto'),semver=require('../vendor/semver');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-function parse(text){return require('internal/deps/acorn/acorn/dist/acorn').parse(text,{ecmaVersion:'latest',sourceType:'module',allowHashBang:true});}
+function parse(text){
+  let parser;
+  try{parser=require('internal/deps/acorn/acorn/dist/acorn');if(typeof parser.parse!=='function')throw Error();}
+  catch{throw Object.assign(new Error('BROWSER_PARSER_UNAVAILABLE'),{code:'BROWSER_PARSER_UNAVAILABLE'});}
+  try{return parser.parse(text,{ecmaVersion:'latest',sourceType:'module',allowHashBang:true});}
+  catch(error){if(error instanceof SyntaxError)throw Object.assign(new Error('BROWSER_SOURCE_SYNTAX_INVALID'),{code:'BROWSER_SOURCE_SYNTAX_INVALID'});throw error;}
+}
 function walk(root,visit,skipFunctions=false){const pending=[root];while(pending.length){const n=pending.pop();if(!n||typeof n.type!=='string')continue;visit(n);if(skipFunctions&&n!==root&&/Function|ArrowFunction/.test(n.type))continue;for(const v of Object.values(n)){if(Array.isArray(v)){for(const x of v)if(x?.type)pending.push(x);}else if(v?.type)pending.push(v);}}}
 const key=n=>n?.type==='Identifier'?n.name:n?.type==='Literal'?n.value:undefined;
 const literal=n=>n?.type==='Literal'&&typeof n.value==='string'?n.value:n?.type==='TemplateLiteral'&&!n.expressions.length?n.quasis[0].value.cooked:undefined;
@@ -112,6 +118,6 @@ function consumer(pkg,name,read,words=[name]){
     if([...bare].some(s=>s===name||s.startsWith(name+'/')))return {ok:false,reason:'peer-consumed-by-node'};
     const hostFiles=[...files].sort(([a],[b])=>a.localeCompare(b,'en')).map(([path,sha256])=>({path,sha256}));
     return {ok:true,clientPath:entry.path,clientSHA256:hash(entry.bytes),requests,hostFiles};
-  }catch{return {ok:false,reason:'consumer-source-unproven'};}
+  }catch(error){return {ok:false,reason:error?.code==='BROWSER_PARSER_UNAVAILABLE'?'browser-parser-unavailable':error?.code==='BROWSER_SOURCE_SYNTAX_INVALID'?'consumer-source-syntax-invalid':'consumer-source-unproven'};}
 }
 module.exports={providers,consumer};

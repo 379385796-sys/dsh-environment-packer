@@ -12,6 +12,10 @@ fs.writeFileSync(path.join(root,other,'terminal.json'),JSON.stringify({id:other,
 fs.writeFileSync(path.join(root,id,'dependency-check.json'),JSON.stringify({id,issues:[{code:'HOST_BROWSER_PEER_UNPROVEN',package:'synthetic-plugin',name:'react',range:'^18.3.1',privateValue:'DO_NOT_EXPOSE'}],hostRequirements:{secret:'DO_NOT_EXPOSE'}}));
 function fingerprint(){return fs.readdirSync(root,{recursive:true}).sort().map(name=>{const file=path.join(root,name),s=fs.statSync(file);return [name,s.mtimeMs,s.isFile()?fs.readFileSync(file).toString('base64'):null]})}
 const before=fingerprint(),snapshot=readUiOverview(home);assert.equal(snapshot.state,'lock-present');assert.equal(snapshot.displayOnly,true);assert.equal(snapshot.current.phase,'failed');assert.equal(snapshot.current.diagnostic.issueCount,1);assert.equal(snapshot.history[0].id,other);assert(!JSON.stringify(snapshot).includes('DO_NOT_EXPOSE'));assert.deepEqual(fingerprint(),before);
+for(const reason of ['browser-parser-unavailable','consumer-source-syntax-invalid','SENSITIVE_RAW_SOURCE']){
+ fs.writeFileSync(path.join(root,id,'dependency-check.json'),JSON.stringify({id,issues:[{code:'HOST_BROWSER_PEER_UNPROVEN',reason,privateValue:'DO_NOT_EXPOSE'}]}));
+ const issue=readUiOverview(home).current.diagnostic.issues[0];assert.equal(issue.reason,reason==='SENSITIVE_RAW_SOURCE'?undefined:reason);assert(!JSON.stringify(issue).includes('SENSITIVE_RAW_SOURCE'));assert(!JSON.stringify(issue).includes('DO_NOT_EXPOSE'));
+}
 fs.writeFileSync(lock,'../../private.json');assert.equal(readUiOverview(home).state,'corrupt');assert.equal(fs.readFileSync(lock,'utf8'),'../../private.json');
 fs.writeFileSync(lock,id);fs.writeFileSync(status,'{broken');assert.equal(readUiOverview(home).current.record,'corrupt');
 fs.writeFileSync(status,JSON.stringify({id:other,phase:'success'}));assert.equal(readUiOverview(home).current.record,'corrupt');

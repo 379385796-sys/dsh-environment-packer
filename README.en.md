@@ -1,12 +1,18 @@
-# DSH Environment Packer · v0.6.3
+# DSH Environment Packer · v0.7.0
 
 Private offline backup and guarded environment migration for DSH, with independent Windows recovery.
 
-[v0.6.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.6.3) · [简体中文](README.md) · [Migration guide](docs/MIGRATION.md) · [Recovery preparation](docs/RECOVERY-PREPARATION.md) · [Cleanup](docs/CLEANUP.md)
+[v0.7.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0) · [简体中文](README.md) · [Migration guide](docs/MIGRATION.md) · [Recovery preparation](docs/RECOVERY-PREPARATION.md) · [Cleanup](docs/CLEANUP.md)
 
-> Scope, acceptance and remaining limits: [RELEASE-0.6.3.md](docs/RELEASE-0.6.3.md). Verify `SHA256SUMS.txt` and retain previous rollback packages and private backups. Market availability depends on the catalog PR being merged.
+> Scope, acceptance and remaining limits: [RELEASE-0.7.0.md](docs/RELEASE-0.7.0.md). Verify `SHA256SUMS.txt` and retain previous rollback packages and private backups. Market availability depends on the catalog PR being merged.
 
-## Final acceptance notes (2026-11-07)
+## v0.7.0 reliability and interaction polish
+
+Browser proof now distinguishes an unavailable parser from unsupported source syntax, while retaining strict refusal. Existing settings, cold-backup and recovery layouts receive restrained local transitions, consistent primary accents and focus feedback. Motion never drives progress, safety decisions or window bounds and honors reduced motion.
+
+Synthetic recovery passed two real isolated DSH starts/stops and commit. Private business recovery, the complete real plugin combination, cross-device migration, real OS DPI and screen-reader speech remain uncertified. Check the actual Release and catalog for publication status.
+
+## Final acceptance notes (2026-11-07) — v0.6.3 历史记录
 
 The product remains **v0.6.3**, with no new product-code fix. Independent review reproduced missing browser-consumer proof under ordinary Node without `--expose-internals`. The shipped cold-backup, migration and strict-recovery assistants already pass this flag. Browser proof depends on Node\'s internal Acorn and remains runtime-sensitive; missing capability blocks recovery. Custom orchestration must follow the [runtime requirement](docs/MIGRATION.md#runtime-requirement-for-browser-peer-proof), never bypass proof.
 
@@ -51,7 +57,7 @@ Download the TGZ and matching SHA-256 from the Release. Save your environment an
 dsh plugin --profile desktop add "<absolute TGZ path>" --offline --ignore-scripts
 ```
 
-Retain the existing Profile's pnpm store. Updating Packer does not require rebuilding the Profile or changing other plugins. Restart and confirm 0.6.3. Verify the exact release assets using `SHA256SUMS.txt`.
+Retain the existing Profile's pnpm store. Updating Packer does not require rebuilding the Profile or changing other plugins. Restart and confirm 0.7.0. Verify the exact release assets using `SHA256SUMS.txt`.
 
 ## Backup and recover
 

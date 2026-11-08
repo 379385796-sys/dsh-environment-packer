@@ -56,7 +56,7 @@ v0.6.2 正式冷备暴露三个剩余问题：`plugins-local` 未分类、`.dshw
 全部在 `DSH_PACKER_TEST_ROOT` 隔离合成目录执行，未读取真实私人载荷、Mnemon、凭据或会话正文。
 
 | 项目 | 结果 |
-|---|---|
+| --- | --- |
 | `test/v063-source-coverage.cjs` | PASS 23 项：源码树采集/排除 `node_modules`、显式分类、未知项保守告警、`.bak` 有无 live 的两种语义、clean 覆盖、确定性映射、暂存摘要、变更/缺失拒绝、清单计数与排除段篡改拒绝、源码树内预编译 `.node` 不触发原生门禁、旧归档兼容、`apply` 实际暂存与 `verify` 源码树门禁 |
 | `test/migration-dependency-gate.cjs` | PASS：/4 记录真实 peer 冲突且包名精确无 `@//`；恢复重分析仍 blocked/critical；/2 /3 严格备份门禁不变；结构错误仍在写盘前失败 |
 | `test/v062-coverage-chain.cjs` | PASS 15 项：偏好采集状态、有界摘要、清单自洽、结果层语义、规范 inspect 与损坏拒绝（回归） |
@@ -86,3 +86,37 @@ Codex 最终修正：sourceTrees 只允许 plugins-local，强制 node_modules �
 惰性源码路径完全保留：源码内部 workspaces/<64位哈希>/ 目录不进入记忆路径重写，完整真实运行时测试包含该反例。
 
 正式 ZIP 的只读恢复计划在独立 CLI 证据条件下还可能报告 HOST_BROWSER_PEER_UNPROVEN（浏览器 peer 的来源/realm 证据不足）；这与归档阶段记录的版本冲突数量不同。仍按 critical 阻断，不伪造浏览器证据，不执行正式恢复。
+
+## 历史 README 补充 / Notes retained from the earlier README
+
+以下为对应版本当时的首页记录，迁入发布文档保留事实；其中版本、状态与验收边界按原记录理解。当前入口见 [产品主页](../README.md)。
+
+### 中文
+
+#### 最终验收说明（2026-11-07） — v0.6.3 历史记录
+
+正式版本保持 **v0.6.3**，没有新增产品修复。独立复核确认：普通 Node 缺少 `--expose-internals` 会使浏览器消费者源码解析失败，被保守报告为 `HOST_BROWSER_PEER_UNPROVEN`；正式冷备、迁移助手和严格恢复助手已传入该标志。浏览器 peer 证明使用 Node 内部 Acorn，存在运行时兼容边界；能力缺失时仍阻断恢复，不能跳过证明。自编排 `plan/apply/verify/commit` 请遵守[运行时要求](MIGRATION.md#runtime-requirement-for-browser-peer-proof)。
+
+[Market v0.6.3 更新](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/12732)已合并，目录使用与 GitHub Release 相同的 TGZ。Rewind 不是 Packer 的必需插件；旧归档内的真实 peer 冲突不会因卸载源环境插件而消失。源环境修正后只能通过正常冷备流程、私人确认另建归档，不能修改旧 ZIP。合成隔离恢复验收不认证私人数据的完整业务恢复。
+
+#### 0.6.3 覆盖分类与恢复诊断
+
+- **本地插件源码树**：`~/.dsh/plugins-local` 不是 DSH 运行时路径，也没有配置引用；其中的包是用户本地源码。v0.6.3 把它作为**惰性数据**采集到 `home-data/plugins-local/`，明确排除 `node_modules` 安装产物，并在清单 `sourceTrees` 记录文件数、字节数、排除项与 `complete`。恢复计划给出到新 Home 的确定映射（`<新Home>/plugins-local`），`apply` 暂存后 `verify` 重新计算文件/字节/摘要，不一致即 `SOURCE_TREE_CHANGED`。源码树只恢复为数据，不会被激活为插件，也不会改写配置。
+- **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
+- **peer 冲突记录与门禁**：正式归档中的记录为 `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0`（实际 `3.18.5`），包名、范围和实际版本准确，不存在 `@//` 形式的重写名。恢复计划重新分析后仍将其标为 `blocked/critical` 并阻止 `apply`/`commit`。本轮没有修改第三方插件、生产依赖或 peer 声明，也没有因为告警数量而放宽门禁。
+- recovery/2、/3 的严格语义未改；recovery/4 的 `verify`/`commit` 门禁未放宽。新增字段对旧归档可选，旧 `dsh-private-recovery/4` 归档仍可读取。
+
+### English
+
+#### Final acceptance notes (2026-11-07) — v0.6.3 历史记录
+
+The product remains **v0.6.3**, with no new product-code fix. Independent review reproduced missing browser-consumer proof under ordinary Node without `--expose-internals`. The shipped cold-backup, migration and strict-recovery assistants already pass this flag. Browser proof depends on Node\'s internal Acorn and remains runtime-sensitive; missing capability blocks recovery. Custom orchestration must follow the [runtime requirement](MIGRATION.md#runtime-requirement-for-browser-peer-proof), never bypass proof.
+
+The [Market v0.6.3 update](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/12732) is merged and references the same TGZ as GitHub Release. Rewind is not required by Packer. Removing it from a source Profile does not repair an existing archive; create a new archive through the normal cold-backup and private-confirmation flow. Synthetic isolated recovery does not certify full business recovery of private data.
+
+#### 0.6.3 coverage classification and recovery diagnostics
+
+- **Local plugin source trees**: `~/.dsh/plugins-local` is not a DSH runtime path and is not referenced by configuration; it holds user-authored local packages. v0.6.3 preserves it as **inert data** under `home-data/plugins-local/`, explicitly excludes `node_modules` install artifacts, and records file count, bytes, exclusions and `complete` in manifest `sourceTrees`. The restore plan exposes a deterministic mapping to `<new Home>/plugins-local`; after staging, `verify` recomputes file/byte/digest fidelity and fails with `SOURCE_TREE_CHANGED` on any mismatch. Source trees are restored as data only: never activated as plugins and never used to rewrite configuration.
+- **Historical cache snapshots**: known `.dshw-{usage,size,turn}.json.<qualifier>.bak` files are preserved under `packages/home-history/`, even without a live file. Live values cannot reconstruct historical values. Recovery keeps them outside runtime Home, in transaction data, without activating or overwriting caches. Unreadable snapshots remain critical gaps.
+- **Peer conflict record and gate**: the formal archive records `dsh-rewind-plugin → @deepseek-ai/schemastery ^3.19.0` (actual `3.18.5`). Package name, range and actual version are exact; no `@//` rewritten name exists. Restore re-analysis still marks it `blocked/critical` and refuses `apply`/`commit`. No third-party plugin, production dependency or peer declaration was modified, and no gate was relaxed to reduce warning counts.
+- recovery/2 and /3 semantics are unchanged; recovery/4 `verify`/`commit` gates are not relaxed. New manifest fields are optional, so existing `dsh-private-recovery/4` archives remain readable.

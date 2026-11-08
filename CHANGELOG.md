@@ -10,6 +10,8 @@
 
 ## 0.6.3 — 2026-11-07
 
+[完整发布说明与历史记录](docs/RELEASE-0.6.3.md)
+
 - **`plugins-local` 分类与保全**：确认为用户本地插件源码区，不是 DSH 运行时路径，也没有 Profile/配置引用。recovery/4 将其源码（排除 `node_modules` 安装产物）采集到 `home-data/plugins-local/`，清单新增可选 `sourceTrees`，记录文件数、字节数、排除项与 `complete`。旧 /4 归档无此字段仍可读取。
 - **恢复映射与保真验证**：计划为每个源码树给出 `to=<新Home>/plugins-local`、`activation=data-only`；`apply` 写入后记录文件/字节/摘要，`verify` 重新计算并在不一致时以 `SOURCE_TREE_CHANGED` 拒绝。源码树不参与插件/依赖解析，也不会被改写为配置。采集失败（链接、类型、容量）不阻断整个归档，而是以 `LOCAL_SOURCE_TREE_INCOMPLETE` 关键缺口报告。
 - **历史快照保全**：已知 `.dshw-{usage,size,turn}.json.<qualifier>.bak` 采集到 `packages/home-history/`，清单记录 `historicalData` 与 `activation: archive-only`；不依赖 live 文件存在。恢复只保留在事务目录，不写入运行时 Home，不覆盖当前缓存。不可读、链接及异常类型保留 critical 缺口，未知 Home 项仍保守告警。
@@ -17,6 +19,8 @@
 - 不改变 recovery/2、/3 语义，不改变归档格式版本，不放宽 /4 的 verify/commit 门禁，不新增服务、自动清理或 UI 功能。
 
 ## 0.6.2 — 2026-11-05（候选，未发布）
+
+[完整发布说明与历史记录](docs/RELEASE-0.6.2.md)
 
 - **Capture state / result closure**: `clientPreferences` is classified as `absent / present-valid / invalid` at the host boundary; `job.json` records only protocol version and state, never the raw body or preference values. Invalid input fails with `CLIENT_PREFERENCE_INVALID`; an absent field still allows a fully readable tree to be archived while keeping `CLIENT_PREFERENCE_NOT_CAPTURED` as a critical coverage gap. No default value is ever substituted to fake a successful capture.
 - Add a bounded, code-only `coverageSummary` (max 8 stable codes) to `manifest.coverage`, `onCommitted`, the worker `done` message, `terminal.json`, `ui-result.json` and `readUiOverview()`. `validate()` checks its shape and requires it to be derivable from `coverage.missing` / `coverage.excluded`, so a rewritten manifest cannot claim a clean capture. `completeWithinDeclaredScope` is now computed from `missing.length` instead of hardcoded; `sourceFilesVerified` keeps its original meaning.
@@ -27,6 +31,8 @@
 - No change to recovery/2 or /3 semantics, dependency/host/schema analysis, verify/commit gates, archive format, encryption or rollback behaviour. No archive repair interface and no automatic cleanup are added.
 
 ## 0.6.1 — 2026-11-05
+
+[完整发布说明与历史记录](docs/RELEASE-0.6.1.md)
 
 - recovery/4 cold backup no longer refuses a fully readable source tree solely because installed peers/engines conflict. The real issues are recorded in `manifest.compatibility` and the dependency report; malformed package metadata and unreadable sources still stop the archive. Restore re-evaluates the same contract, so unresolved critical issues still block apply/commit. recovery/2 and recovery/3 backup/restore gates are unchanged.
 - The standalone WinForms assistant uses coordinated Fluent light/dark palettes. The light primary action is a readable blue instead of a dark block; secondary buttons keep a visible surface/border; hover, pressed, disabled and focus states are unified. Dark-theme header actions, copy buttons, log text and disabled controls now set explicit readable foregrounds; text boxes show a blue focus border. The DWM caption/border colors are matched to the content background where Windows supports them.
@@ -86,7 +92,8 @@ Introduce explicit private backup and narrow safe export modes, verified new-hom
 ## 0.3.4 and earlier — local development
 
 Historical local versions and audits remain private. Their directory/declaration formats are not accepted by the new restore helper. This repository starts from a reviewed snapshot; it does not recreate or backdate missing development commits.
-# 0.4.3 (candidate)
+
+## 0.4.3 (candidate)
 
 - Guard task startup, cleanup and recovery with Windows kernel file leases and process birth identities.
 - Add Packer recovery action; refuse active, corrupt, uncertain and unsupported legacy task evidence.

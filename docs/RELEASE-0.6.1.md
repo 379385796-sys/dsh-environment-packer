@@ -42,3 +42,25 @@
 - `SHA256SUMS.txt` / 同名 `.sha256` — 精确校验值；本文件不内嵌自哈希。
 
 v0.6.1 已安装到正式环境并提交 GitHub；DSH Market 条目将单独提交，审核状态以实际 PR 为准。
+
+## 历史 README 补充 / Notes retained from the earlier README
+
+以下为对应版本当时的首页记录，迁入发布文档保留事实；其中版本、状态与验收边界按原记录理解。当前入口见 [产品主页](../README.md)。
+
+### 中文
+
+#### 0.6.1 定向修复
+
+- recovery/4 冷备允许在依赖版本/peer 冲突存在时归档可完整读取的源文件；真实冲突写入归档元数据与备份报告，恢复计划仍会重新检查并阻断未解决的关键问题。recovery/2、recovery/3 的严格语义不变。
+- 独立助手改用协调的 Fluent 浅色/深色配色；浅色主按钮不再使用深色大块。按钮、边框、圆角、悬停、禁用和焦点状态统一，深色页眉操作/复制按钮/日志文本显式提升对比度，标题栏在支持时与内容背景协调。
+- 助手改为紧凑的向导布局：五步流程、运行状态、保存位置和结果分区；任务详情与外观收进顶部次级操作组；路径可复制；窗口高度按当前内容收紧，等待页不再保留大面积空白。
+- 备份结束不再自动关闭。成功页显示 ZIP 路径、大小、SHA-256、ZIP 完整性结果和完成时间；存在依赖冲突时用独立琥珀色提示条区分“ZIP 完整性通过”与“恢复兼容性待检查”，不改变成功判定或恢复门禁。失败、取消、中断分别显示，结果持久保留并可在 Packer 任务记录中查看。
+
+### English
+
+#### 0.6.1 targeted fixes
+
+- recovery/4 cold backup can archive a fully readable source tree even when installed peers/versions conflict. The real conflicts are written to the archive metadata and backup report; restore still re-evaluates them and blocks unresolved critical issues. recovery/2 and recovery/3 keep their strict semantics.
+- The standalone helper uses coordinated Fluent light/dark palettes. The light primary action is no longer a large dark block; button, border, radius, hover, disabled and focus states are unified. Dark header actions, copy buttons, log text and disabled controls set explicit readable foregrounds; the DWM caption is matched to the content background where supported.
+- The helper is a compact wizard: five steps, run status, save location and result are separate regions; details/appearance are grouped as secondary actions; the path can be copied. The window height tightens to the current content, so the waiting page no longer keeps a large blank area.
+- The helper no longer closes automatically. Success shows the ZIP path, size, SHA-256, ZIP integrity result and completion time. When dependency conflicts were recorded, a restrained amber strip separates "ZIP integrity passed" from "recovery compatibility to check"; it changes neither the success result nor the restore gate. Failure, cancellation and interruption stay distinct and are persisted for later viewing in Packer's task records.

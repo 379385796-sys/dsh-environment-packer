@@ -11,6 +11,7 @@ import { chooseDirectory, chooseSavePath, confirmColdBackup } from './lib/dialog
 import { startColdTask } from './lib/cold-task.js';
 import { recoverColdTask } from './lib/task-guard.js';
 import { readUiOverview } from './lib/ui-overview.js';
+import { startColdRetention } from './lib/cold-retention.js';
 import { TargetDirectoryError, defaultDirectory, resolveDirectory, resolveTarget, safeDefaultName } from './lib/target.js';
 import {
   TargetExistsError,
@@ -202,7 +203,7 @@ export function apply(ctx, config = {}) {
             ok: true,
             profileDirectory: currentProfile,
             taskOverview: readUiOverview(process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh')),
-            version: '0.7.0',
+            version: '0.7.1',
             coldOnly: true,
             quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),
@@ -352,7 +353,9 @@ export function apply(ctx, config = {}) {
   ctx.effect(() => {
     ensureRoute();
     const off = ctx.on('internal/service', ensureRoute);
+    const stopRetention = startColdRetention(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'));
     return () => {
+      stopRetention();
       off?.();
       try { routeDispose?.(); } catch { /* best effort */ }
       routeDispose = undefined;

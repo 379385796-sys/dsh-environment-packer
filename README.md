@@ -2,11 +2,11 @@
 
 **环境恢复包 · 给熟悉的 DSH 环境，留一份可以带走的备份。**
 
-[![版本 0.7.0](https://img.shields.io/badge/version-0.7.0-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0)
+[![版本 0.7.1](https://img.shields.io/badge/version-0.7.1-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.1)
 ![Windows x64](https://img.shields.io/badge/platform-Windows_x64-697586)
 [![MIT License](https://img.shields.io/badge/license-MIT-697586)](LICENSE)
 
-[下载 v0.7.0](#下载与安装) · [快速上手](#备份与恢复) · [完整文档](#文档与反馈) · [English](README.en.md)
+[下载 v0.7.1](#下载与安装) · [快速上手](#备份与恢复) · [完整文档](#文档与反馈) · [English](README.en.md)
 
 升级前留一份备份，重装或迁移时少一些从头配置。Packer 将当前 Profile 的插件、设置和支持的会话数据收进私人离线归档，再由独立助手引导你在新环境恢复。保存了什么、检查到哪一步、哪些问题需要处理，都有清楚的结果可查。
 
@@ -19,7 +19,7 @@
 - **DSH 无法启动时也有入口**：完整独立恢复工具可单独打开，使用已安装的兼容 DSH 检查与恢复。
 - **结果可以核对**：查看任务记录、文件摘要与检查结论；关键缺口或兼容问题会明确显示。
 
-**v0.7.0 亮点**：更连贯的页面与操作反馈、更清楚的恢复诊断，并支持减少动态效果。[查看本版说明 →](docs/RELEASE-0.7.0.md)
+**v0.7.1 亮点**是自动清理已安全结束的旧任务记录，保留期为 10 天。 [本版说明](docs/RELEASE-0.7.1.md)
 
 ## 看看界面
 
@@ -40,13 +40,13 @@
 
 ## 下载与安装
 
-从 [v0.7.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0) 下载所需文件，并用同页的校验清单核对 SHA-256：
+从 [v0.7.1 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.1) 下载所需文件，并用同页的校验清单核对 SHA-256：
 
 | 下载 | 用途 |
 | --- | --- |
-| [插件 TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/dsh-environment-packer-0.7.0.tgz) | 安装到 DSH |
-| [独立恢复工具 ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/Packer-v0.7.0-Standalone-Recovery.zip) | 在需要恢复时单独使用；请保留完整目录 |
-| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/SHA256SUMS.txt) | 核对下载文件 |
+| [插件 TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/dsh-environment-packer-0.7.1.tgz) | 安装到 DSH |
+| [独立恢复工具 ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/Packer-v0.7.1-Standalone-Recovery.zip) | 在需要恢复时单独使用；请保留完整目录 |
+| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/SHA256SUMS.txt) | 核对下载文件 |
 
 保存工作并正常退出全部 DSH 实例后，通过当前 Desktop 的官方插件管理流程安装 TGZ。已配置 CLI 时可用：
 
@@ -54,9 +54,9 @@
 dsh plugin --profile desktop add "<TGZ 绝对路径>" --offline --ignore-scripts
 ```
 
-重新启动后，在 **设置 → 环境恢复包** 确认版本为 0.7.0。升级已有 Profile 请沿用原 pnpm store，保留旧版回退包；离线缓存准备与回退方法见 [升级指南](docs/UPGRADE-ROLLBACK.md)。
+重新启动后，在 **设置 → 环境恢复包** 确认版本为 0.7.1。升级已有 Profile 请沿用原 pnpm store，保留旧版回退包；离线缓存准备与回退方法见 [升级指南](docs/UPGRADE-ROLLBACK.md)。
 
-DSH Market 的 [v0.7.0 更新 PR](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13268) 仍待合并；目前可直接使用上面的正式 Release 下载。
+Market 当前版本可查看 [DSH Market 目录条目](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/data/plugins/379385796-sys__dsh-environment-packer.yml)。
 
 ## 备份与恢复
 
@@ -90,7 +90,7 @@ DSH Market 的 [v0.7.0 更新 PR](https://github.com/awesome-dsh-plugin/awesome-
 
 - **准备与恢复**：[准备清单](docs/RECOVERY-PREPARATION.md) · [恢复指南](docs/RESTORE.zh-CN.md) · [迁移细节](docs/MIGRATION.md)
 - **支持与维护**：[兼容范围](docs/COMPATIBILITY.md) · [升级与回退](docs/UPGRADE-ROLLBACK.md) · [卸载与清理](docs/CLEANUP.md)
-- **版本与记录**：[CHANGELOG](CHANGELOG.md) · [v0.7.0 说明](docs/RELEASE-0.7.0.md) · [全部 Releases](https://github.com/379385796-sys/dsh-environment-packer/releases)
+- **版本与记录**：[CHANGELOG](CHANGELOG.md) · [v0.7.1 说明](docs/RELEASE-0.7.1.md) · [全部 Releases](https://github.com/379385796-sys/dsh-environment-packer/releases)
 - **问题与建议**：[提交 Issue](https://github.com/379385796-sys/dsh-environment-packer/issues)
 
 采用 [MIT License](LICENSE)。欢迎分享使用建议；反馈时请勿附上私人 ZIP、凭据或未脱敏日志。

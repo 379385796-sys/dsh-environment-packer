@@ -16,6 +16,11 @@ try {
   while ($null -ne ($line = [Console]::In.ReadLine())) {
     try {
       $request = $line | ConvertFrom-Json
+      if ($Exclusive -and $request.operation -eq 'prune-retired') {
+        . (Join-Path $PSScriptRoot 'cold-retention.ps1')
+        $removed=Invoke-PackerRetention ([string]$request.home) $Path $stream ([long]$request.now)
+        [Console]::Out.WriteLine((@{operation=$true;removed=$removed}|ConvertTo-Json -Compress));[Console]::Out.Flush();continue
+      }
       if ($Exclusive -and $request.operation -in @('legacy-check','legacy-retire')) {
         . (Join-Path $PSScriptRoot 'legacy-proof.ps1')
         $proof=Invoke-LegacyRecovery ([string]$request.home) ([string]$request.id) ($request.operation -eq 'legacy-retire')

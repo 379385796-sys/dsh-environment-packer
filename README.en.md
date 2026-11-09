@@ -2,11 +2,11 @@
 
 **Keep a portable backup of the DSH environment you've made your own.**
 
-[![Version 0.7.0](https://img.shields.io/badge/version-0.7.0-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0)
+[![Version 0.7.1](https://img.shields.io/badge/version-0.7.1-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.1)
 ![Windows x64](https://img.shields.io/badge/platform-Windows_x64-697586)
 [![MIT License](https://img.shields.io/badge/license-MIT-697586)](LICENSE)
 
-[Download v0.7.0](#download-and-install) · [Get started](#back-up-and-restore) · [Documentation](#documentation-and-feedback) · [简体中文](README.md)
+[Download v0.7.1](#download-and-install) · [Get started](#back-up-and-restore) · [Documentation](#documentation-and-feedback) · [简体中文](README.md)
 
 A clean install shouldn't mean rebuilding every setting from memory. Packer brings your selected Profile's plugins, configuration and supported session data into a private offline archive. When you need it, an independent assistant guides recovery into a fresh environment—with clear records of what was saved, what was checked and what needs attention.
 
@@ -19,7 +19,7 @@ A clean install shouldn't mean rebuilding every setting from memory. Packer brin
 - **Open recovery even when DSH won't start.** The complete standalone toolkit works independently, using an installed compatible DSH runtime for checks and recovery.
 - **See a result you can inspect.** Task history, file hashes and explicit coverage or compatibility findings keep the outcome clear.
 
-**New in v0.7.0:** smoother, restrained interface feedback, clearer recovery diagnostics and reduced-motion support. [Read the release notes →](docs/RELEASE-0.7.0.md)
+**New in v0.7.1** — automatic 10-day retention for safely retired task records. [Release notes](docs/RELEASE-0.7.1.md)
 
 ## A look inside
 
@@ -40,13 +40,13 @@ These are real v0.7.0 interfaces captured in empty isolated environments, withou
 
 ## Download and install
 
-Get the files you need from the [v0.7.0 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.0), then verify their SHA-256 hashes against its checksum list.
+Get the files you need from the [v0.7.1 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.1), then verify their SHA-256 hashes against its checksum list.
 
 | Download | Purpose |
 | --- | --- |
-| [Plugin TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/dsh-environment-packer-0.7.0.tgz) | Install Packer in DSH |
-| [Standalone recovery ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/Packer-v0.7.0-Standalone-Recovery.zip) | Keep the complete extracted folder for independent recovery |
-| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.0/SHA256SUMS.txt) | Verify your downloads |
+| [Plugin TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/dsh-environment-packer-0.7.1.tgz) | Install Packer in DSH |
+| [Standalone recovery ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/Packer-v0.7.1-Standalone-Recovery.zip) | Keep the complete extracted folder for independent recovery |
+| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.1/SHA256SUMS.txt) | Verify your downloads |
 
 Save your work and fully quit DSH before installing the TGZ through your Desktop version's official plugin-management workflow. With the CLI configured:
 
@@ -54,9 +54,9 @@ Save your work and fully quit DSH before installing the TGZ through your Desktop
 dsh plugin --profile desktop add "<absolute TGZ path>" --offline --ignore-scripts
 ```
 
-Restart DSH and confirm **0.7.0** in **Settings → 环境恢复包**. Retain the existing Profile's pnpm store and your previous rollback package. See the [upgrade guide](docs/UPGRADE-ROLLBACK.md) for offline-cache preparation and rollback.
+Restart DSH and confirm **0.7.1** in **Settings → 环境恢复包**. Retain the existing Profile's pnpm store and your previous rollback package. See the [upgrade guide](docs/UPGRADE-ROLLBACK.md) for offline-cache preparation and rollback.
 
-The [v0.7.0 Market update](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/13268) is awaiting merge. The official Release downloads above are available now.
+See the [DSH Market catalog entry](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/blob/main/data/plugins/379385796-sys__dsh-environment-packer.yml) for the version currently listed in Market.
 
 ## Back up and restore
 
@@ -90,7 +90,7 @@ File integrity is not certification of private business recovery. Full real-worl
 
 - **Prepare and recover:** [Preparation](docs/RECOVERY-PREPARATION.md) · [Recovery guide](docs/RESTORE.md) · [Migration details](docs/MIGRATION.md)
 - **Support and maintenance:** [Compatibility](docs/COMPATIBILITY.md) · [Upgrade and rollback](docs/UPGRADE-ROLLBACK.md) · [Uninstall and cleanup](docs/CLEANUP.md)
-- **Changes and history:** [Changelog](CHANGELOG.md) · [v0.7.0 notes](docs/RELEASE-0.7.0.md) · [All releases](https://github.com/379385796-sys/dsh-environment-packer/releases)
+- **Changes and history:** [Changelog](CHANGELOG.md) · [v0.7.1 notes](docs/RELEASE-0.7.1.md) · [All releases](https://github.com/379385796-sys/dsh-environment-packer/releases)
 - **Questions and suggestions:** [Open an issue](https://github.com/379385796-sys/dsh-environment-packer/issues)
 
 Released under the [MIT License](LICENSE). Feedback is welcome—please leave private archives, credentials and unredacted logs out of public issues.

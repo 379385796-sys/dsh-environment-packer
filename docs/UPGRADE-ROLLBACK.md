@@ -1,8 +1,10 @@
 # Upgrade and rollback
 
-> **Current source: v0.7.0.** The sections below are historical procedures for 0.5.0, 0.4.2 and 0.6.2; keep them for provenance but use the v0.7.0 notes first.
+## v0.7.1 upgrade / rollback notes
 
-## v0.7.0 upgrade / rollback notes
+Retain the verified v0.7.0 TGZ. Exit DSH normally and use the official plugin installation path with the existing Profile store. After restarting, check Packer v0.7.1 and its task history. To roll back, exit DSH and install the retained v0.7.0 TGZ through the same official path. Preserve the current Profile, archives and unrelated plugin versions. Switching versions does not reconstruct already expired diagnostic records.
+
+## v0.7.0 upgrade / rollback notes (historical)
 
 Keep the verified v0.6.3 TGZ, installed package/config/lock snapshots and private archives. Wait for active DSH work to finish, exit normally, then use the existing official offline CLI with `--offline --ignore-scripts` and the existing Profile store. Verify only Packer changed and check startup/settings. No production restore is part of an upgrade. To roll back, normally exit DSH and install the retained v0.6.3 TGZ through the same path; verify package files and unrelated plugin/config invariance. Never copy an old lockfile over concurrent unrelated changes. No archive schema migration is required.
 

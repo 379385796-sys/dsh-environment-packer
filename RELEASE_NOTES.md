@@ -1,6 +1,6 @@
 # v0.5.0 — Offline disaster recovery / 离线灾难恢复
 
-> **Historical release notes.** Retained for provenance; this is not the current release. Current: [v0.7.0 release notes](docs/RELEASE-0.7.0.md), [README.md](README.md).
+> **Historical release notes.** Retained for provenance; this is not the current release. Current: [v0.7.1 release notes](docs/RELEASE-0.7.1.md), [README.md](README.md).
 
 ## 中文
 

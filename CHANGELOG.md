@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2 — 2026-11-12
+
+- 未知 Home 数据保全：白名单外的顶层目录不再只记录不采集，而是作为 `pendingReview` 惰性树采集到 `home-data/<name>/`，清单记录文件数、字节数与跳过项（链接/超大/特殊文件）。`needsReview` 与恢复阻断保持不变；恢复时映射到 `<state>/pending-review/<name>`，不写入新 Home、不激活为运行时状态。
+- 覆盖标志一致：`completeWithinDeclaredScope` 计入 `needsReview` 条目，不再与 `coverage.summary.state` 相互矛盾；未分类目录仍报 `HOME_ITEM_UNCLASSIFIED` 并阻断 apply。
+- 外部路径识别：`~/`、`%VAR%`、`$env:VAR` 先展开再判定，DSH Home 内路径不误报；相对路径单独报 `RELATIVE_PATH_UNDETERMINED`（非阻断）；键名扩展到 `storage/store/location/output/data/db`。
+- 备份目标卷探测：写入 ZIP 前先探测可写性、ACL 与硬链接能力，明确报 `TARGET_VOLUME_NOT_WRITABLE`、`TARGET_VOLUME_NO_ACL`、`TARGET_VOLUME_NO_HARDLINK`，不再只给笼统的 `PRIVATE_ACL_FAILED`；原子提交方式不变。
+- 不改变 recovery/2、/3、/4 格式与 verify/commit 门禁，旧 /4 归档（无 `pendingReview`）仍可读取。详见 [v0.7.2 说明](docs/RELEASE-0.7.2.md)。
+
 ## 0.7.1 — 2026-11-09
 
 - 启动及每 24 小时静默清理满 10 天且已安全退役的冷备诊断与历史记录。复用任务锁，按文件句柄拒绝重解析点、硬链接与身份变化，保留不确定的现场和全部归档。详见 [v0.7.1 说明](docs/RELEASE-0.7.1.md)。

@@ -21,7 +21,12 @@ function assertBinding(p,{staged=false}={}){
 function destination(p,f){
   const l=p.layout,n=f.path;
   if(n.startsWith('profiles/desktop/'))return path.join(l.profile,n.slice(17));
-  if(n.startsWith('home-data/'))return path.join(l.home,n.slice(10));
+  if(n.startsWith('home-data/')){
+    const rest=n.slice(10),pending=(p.pendingReview||[]).find(t=>rest===t.name||rest.startsWith(t.name+'/'));
+    // Pending-review data stays outside the new DSH home: preserved, not activated.
+    if(pending)return path.join(pending.to,rest.slice(pending.name.length+1));
+    return path.join(l.home,rest);
+  }
   if(n.startsWith('packages/'))return path.join(l.state,n);
   if(n.startsWith('preferences/'))return path.join(l.state,n);
   const m=n.match(/^workspaces\/([^/]+)\/(config|data)\/(.+)$/);if(!m)C.fail('INVALID_MIGRATION_SCOPE');

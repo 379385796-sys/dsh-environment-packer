@@ -1,6 +1,6 @@
 'use strict';
 // Data-only adapters. No Profile imports, expressions, SQL, or archive scripts execute here.
-const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
+const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib'),os=require('node:os');
 const {pathToFileURL}=require('node:url'),C=require('./recovery-core.cjs');
 const canonical=p=>path.win32.normalize(p).replace(/[\\/]+$/,'').toLowerCase();
 const inside=(root,p)=>canonical(p)===canonical(root)||canonical(p).startsWith(canonical(root)+'\\');
@@ -60,11 +60,34 @@ function configPaths(tree){
     if(/skill/.test(owner))for(const key of ['customSkillDirs'])if(Array.isArray(c[key]))c[key].forEach((value,index)=>result.push({owner,key:index,value,kind:'skills',object:c[key]}));
   }return result;
 }
-function unknownConfigPaths(tree,{mnemonTool=false}={}){
-  const known=configPaths(tree),out=[];
+// A reference that resolves inside DSH_HOME (or the default Home) is already
+// captured with the Home tree, so it is not an external gap.
+function homeRoots(explicit){
+  const out=[];for(const p of [explicit,process.env.DSH_HOME,path.join(os.homedir(),'.dsh')])if(typeof p==='string'&&path.win32.isAbsolute(p))out.push(p);
+  return out;
+}
+function expandReference(value){
+  let v=value.trim(),unresolved=false;
+  if(v==='~'||/^[~][\\/]/.test(v))v=path.join(os.homedir(),v.slice(1));
+  const fill=(all,name)=>{const val=process.env[name];if(val===undefined){unresolved=true;return all;}return val;};
+  v=v.replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g,fill).replace(/\$env:([A-Za-z_][A-Za-z0-9_]*)/gi,fill);
+  return {value:v,unresolved};
+}
+// Only values that look like paths are considered, so bare enum/flag strings
+// stay out while data directories hiding behind plain keys are still caught.
+const PATH_KEY=/(?:path|directory|directories|dir|dirs|root|roots|cwd|file|command|storage|store|location|output|data|database|db)$/i;
+const pathish=v=>typeof v==='string'&&v.length>0&&v.length<=1024&&(/^[~%$]/.test(v)||/[\\/]/.test(v)||/^[A-Za-z]:/.test(v));
+function unknownConfigPaths(tree,{mnemonTool=false,homeDir}={}){
+  const known=configPaths(tree),out=[],homes=homeRoots(homeDir);
   for(const entry of entries(tree)){
     function visit(value){if(!value||typeof value!=='object')return;for(const [key,v]of Object.entries(value)){
-      if(typeof v==='string'&&path.win32.isAbsolute(v)&&/(path|directory|directories|dir|dirs|root|roots|cwd|file|command)$/i.test(key)&&!known.some(p=>p.object===value&&String(p.key)===key)&&!(mnemonTool&&entry.id==='mnemon'&&key==='cliPath'))out.push({owner:entry.id,key,reference:v});
+      if(pathish(v)&&PATH_KEY.test(key)&&!known.some(p=>p.object===value&&String(p.key)===key)&&!(mnemonTool&&entry.id==='mnemon'&&key==='cliPath')){
+        const {value:expanded,unresolved}=expandReference(v),absolute=!unresolved&&path.win32.isAbsolute(expanded);
+        // Relative and unresolvable references cannot be mapped safely; the
+        // plan reports them without treating them as proven external data.
+        if(!absolute)out.push({owner:entry.id,key,reference:v,expanded,kind:unresolved?'env':'relative'});
+        else if(!homes.some(h=>inside(h,expanded)))out.push({owner:entry.id,key,reference:v,expanded,kind:/^[~]/.test(v)?'home':/%|\$env:/i.test(v)?'env':'absolute'});
+      }
       else if(v&&typeof v==='object')visit(v);
     }}visit(entry.config);
   }return out;

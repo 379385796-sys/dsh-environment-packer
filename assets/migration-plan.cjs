@@ -50,9 +50,12 @@ async function scanData(arc){
   // Preserved local source trees are inert data, not environment datasets.
   // Never interpret their .db/.json/.md files as storage, database or skills.
   const sourcePrefixes=(arc.manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
+  // Pending-review Home trees are inert copies awaiting a human decision: never
+  // interpret their files as live storage, databases or skills.
+  const pendingPrefixes=(arc.manifest.pendingReview||[]).map(t=>t.archivePrefix+'/');
   function workspace(p){if(!roots.some(r=>r.kind==='workspace'&&A.canonical(r.path)===A.canonical(p)))roots.push({id:'workspace-'+A.id(p),kind:'workspace',path:p,exists:false});}
   for(const f of files){
-    if(sourcePrefixes.some(prefix=>f.path.startsWith(prefix)))continue;
+    if(sourcePrefixes.some(prefix=>f.path.startsWith(prefix))||pendingPrefixes.some(prefix=>f.path.startsWith(prefix)))continue;
     if(f.path.startsWith('home-data/sessions/')&&/\.jsonl(?:\.zstd)?$/.test(f.path)){
       const bytes=get(arc,f),{header}=A.decodeSession(bytes,f.path);for(const cwd of A.sessionPaths(bytes,f.path))workspace(cwd);
       datasets.push({path:f.path,adapter:'session-v4',sessionId:header.id,version:header.version,state:header.version===4?'converted':'unknown',critical:true});if(header.version!==4)issues.push({code:'SESSION_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
@@ -67,7 +70,10 @@ async function scanData(arc){
       const Y=await A.yaml();let tree;try{tree=Y.load(get(arc,f).toString('utf8'));}catch{C.fail('PROFILE_PATCH_INVALID');}
       for(const p of A.configPaths(tree))if(p.kind==='workspace')workspace(p.value);
       for(const e of A.entries(tree))if(e.id==='prompt-inject')Object.keys(e.config.workspaceOverrides||{}).forEach(workspace);
-      for(const r of A.unknownConfigPaths(tree,{mnemonTool:(arc.manifest.tools||[]).some(t=>t.name==='mnemon')}))issues.push({code:'UNMAPPED_EXTERNAL_PATH_FIELD',owner:r.owner,key:r.key,state:'unknown',critical:true});
+      const homeRoot=arc.manifest.roots.find(r=>r.kind==='home')?.path;
+      for(const r of A.unknownConfigPaths(tree,{mnemonTool:(arc.manifest.tools||[]).some(t=>t.name==='mnemon'),homeDir:homeRoot}))issues.push(r.kind==='relative'
+        ?{code:'RELATIVE_PATH_UNDETERMINED',owner:r.owner,key:r.key,path:r.reference,state:'unknown',critical:false}
+        :{code:'UNMAPPED_EXTERNAL_PATH_FIELD',owner:r.owner,key:r.key,path:r.expanded||r.reference,state:'unknown',critical:true});
     }
     if(/\.(?:db|sqlite|sqlite3)$/i.test(f.path)&&!f.path.includes('/node_modules/')){
       const known=A.sqliteHeader(get(arc,f))&&f.path.endsWith('/mnemon.db')&&(arc.manifest.tools||[]).some(t=>t.name==='mnemon');datasets.push({path:f.path,adapter:'sqlite-preserve',state:known?'requires-owner-validation':'unknown',critical:true});if(!known)issues.push({code:'DATABASE_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
@@ -101,7 +107,11 @@ async function plan({zipFile,installation,workspace}){
     // Source trees are restored into the new Home as data only. They are never
     // activated as plugins and never rewritten as configuration.
     const sourceTrees=(arc.manifest.sourceTrees||[]).map(t=>({name:t.name,to:path.join(layout.home,t.restorePath),files:t.fileCount,bytes:t.bytes,activation:'data-only'}));
-    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),sourceTrees,datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
+    // Unclassified Home data is restored outside the new DSH home: preserved
+    // for review, never activated as runtime state.
+    const pendingReview=(arc.manifest.pendingReview||[]).map(t=>({name:t.name,to:path.join(layout.state,'pending-review',t.name),files:t.fileCount,bytes:t.bytes,skipped:t.skippedCount||0,activation:'pending-review'}));
+    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),sourceTrees,pendingReview,datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
+    if(pendingReview.length)result.actions.push('preserve-pending-review-data');
     result.expectedSkills=data.skills.map(s=>({...s,cwd:s.path.startsWith('workspaces/')?map.find(r=>r.id===s.path.split('/')[1])?.to||layout.workspace:layout.workspace}));
     result.requiresPreferenceImport=arc.manifest.files.some(f=>f.path==='preferences/dsh-chat-comfort.settings.v1.json');
     result.expectedStorage=data.storage;
@@ -123,5 +133,6 @@ function validatePlan(p){
   for(const [key,expected]of Object.entries({state:expectedState,parent:path.dirname(l.workspace),home:path.join(expectedState,'home'),profile:path.join(expectedState,'home/profiles/desktop'),agents:path.join(expectedState,'agents'),userData:path.join(expectedState,'electron')}))if(l[key]!==expected)C.fail('PLAN_LAYOUT_INVALID');
   for(const r of p.mappings)if(!A.inside(l.workspace,r.to))C.fail('PLAN_LAYOUT_INVALID');for(const r of p.externalRoots)if(!A.inside(l.state,r.to)&&!(r.workspaceRelative&&A.inside(l.workspace,r.to)))C.fail('PLAN_LAYOUT_INVALID');
   for(const t of p.sourceTrees||[])if(t.to!==path.join(l.home,t.name)||!A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');
+  for(const t of p.pendingReview||[])if(t.to!==path.join(l.state,'pending-review',t.name)||!A.inside(l.state,t.to)||A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');
 }
 module.exports={stable,digest,get,hasUnresolvedCritical,packageRecords,compatibility,targetLayout,scanData,inspect,plan,validatePlan};

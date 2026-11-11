@@ -37,6 +37,23 @@ function privateAccess(target, directory = false) {
   const result = spawnSync('icacls.exe', [target, '/inheritance:r', '/grant:r', `*${sid}:${inherit}F`, `*S-1-5-18:${inherit}F`], { encoding: 'utf8', windowsHide: true });
   if (result.status !== 0) fail('PRIVATE_ACL_FAILED');
 }
+// The commit step needs a private ACL plus a hard link on the target volume.
+// exFAT, FAT32 and most network shares provide neither, so probe the target
+// before the scan instead of failing late with a generic ACL error.
+function probeTarget(directory) {
+  const base = path.join(directory, '.packer-target-probe-' + process.pid + '-' + Date.now().toString(36));
+  const link = base + '.lnk';
+  try { fs.writeFileSync(base, Buffer.from('probe'), { mode: 0o600, flag: 'wx' }); }
+  catch { return 'TARGET_VOLUME_NOT_WRITABLE'; }
+  try {
+    try { privateAccess(base); } catch { return 'TARGET_VOLUME_NO_ACL'; }
+    try { fs.linkSync(base, link); } catch { return 'TARGET_VOLUME_NO_HARDLINK'; }
+    return null;
+  } finally {
+    try { fs.unlinkSync(link); } catch {}
+    try { fs.unlinkSync(base); } catch {}
+  }
+}
 const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let i=0;i<8;i++) c=c&1 ? 0xedb88320^(c>>>1) : c>>>1; return c>>>0; });
 function crc(data) { let c=0xffffffff; for (const b of data) c=table[(c^b)&255]^(c>>>8); return (c^0xffffffff)>>>0; }
 function identity(st) { return `${st.dev}:${st.ino}`; }
@@ -136,4 +153,4 @@ function validateManifest(zip) {
   for(const f of m.files) { const b=zip.get(f.path); if(b.length!==f.bytes||sha(b)!==f.sha256) fail('HASH_MISMATCH'); }
   return m;
 }
-module.exports={MAX_FILE,MAX_TOTAL,MAX_ENTRIES,fail,sha,safeName,noLinks,exists,privateAccess,identity,readStable,ZipWriter,openZip,validateManifest};
+module.exports={MAX_FILE,MAX_TOTAL,MAX_ENTRIES,fail,sha,safeName,noLinks,exists,privateAccess,probeTarget,identity,readStable,ZipWriter,openZip,validateManifest};

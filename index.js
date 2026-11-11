@@ -44,6 +44,9 @@ const CALLER_CODES = new Set([
   'TARGET_MUST_BE_ZIP',
   'TARGET_PARENT_MISSING',
   'TARGET_PARENT_REPARSE',
+  'TARGET_VOLUME_NOT_WRITABLE',
+  'TARGET_VOLUME_NO_ACL',
+  'TARGET_VOLUME_NO_HARDLINK',
 ]);
 
 function sendJson(response, status, payload) {
@@ -203,7 +206,7 @@ export function apply(ctx, config = {}) {
             ok: true,
             profileDirectory: currentProfile,
             taskOverview: readUiOverview(process.env.DSH_HOME ?? path.join(os.homedir(), '.dsh')),
-            version: '0.7.1',
+            version: '0.7.2',
             coldOnly: true,
             quitMode: 'manual-normal-exit',
             directory: defaultDirectory(),

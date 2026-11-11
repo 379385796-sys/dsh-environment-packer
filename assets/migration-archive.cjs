@@ -54,6 +54,22 @@ function addSourceTree(source,relative,files,dirs){
   else files.push(fileRecord(source,relative));
   if(files.length+dirs.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
 }
+// Unclassified Home entries are preserved as inert pending-review data: regular
+// files are archived, links are never followed (they are recorded as skipped),
+// and a bounded budget keeps one unknown cache from eating the whole archive.
+const PENDING_REVIEW_BYTES=256*1024*1024,PENDING_REVIEW_ENTRIES=20000,PENDING_REVIEW_SKIPPED=100;
+function addInertTree(source,relative,files,dirs,skipped,budget){
+  const s=fs.lstatSync(source);
+  if(s.isSymbolicLink()){skipped.push({path:relative,kind:'link'});return;}
+  C.noLinks(source);C.safeName(relative);
+  if(s.isDirectory()){dirs.push(relative);for(const name of fs.readdirSync(source).sort())addInertTree(path.join(source,name),relative+'/'+name,files,dirs,skipped,budget);}
+  else if(s.isFile()){
+    if(s.size>C.MAX_FILE){skipped.push({path:relative,kind:'size'});return;}
+    budget.bytes+=s.size;budget.entries+=1;
+    if(budget.bytes>PENDING_REVIEW_BYTES||budget.entries>PENDING_REVIEW_ENTRIES)C.fail('PENDING_REVIEW_LIMIT');
+    files.push(fileRecord(source,relative));
+  }else skipped.push({path:relative,kind:'special'});
+}
 function sourceJson(p){try{return JSON.parse(C.readStable(p));}catch(e){C.fail(e.code||'SOURCE_JSON_INVALID');}}
 async function discover({homeDir,profileDir,workspaceRoot,agentsDir,clientPreferences}={}){
   for(const p of [homeDir,profileDir])C.noLinks(p);
@@ -126,6 +142,24 @@ async function inventory(options){
       entry.needsReview=true;layout.missing.push({code:'HISTORICAL_DATA_INCOMPLETE',critical:true});
     }
   }
+  // Unclassified Home entries are archived as inert pending-review data. They
+  // keep needsReview, so restore still refuses until a human reviews them, and
+  // the restore engine places them outside the new DSH home (never activated).
+  const pendingReview=[];
+  for(const entry of layout.excluded.filter(e=>e.reason==='unclassified-home-entry')){
+    const source=path.join(options.homeDir,entry.name),treeFiles=[],treeDirs=[],skipped=[],budget={bytes:0,entries:0};
+    try{
+      if(!fs.lstatSync(source).isDirectory())C.fail('SOURCE_TYPE_OR_SIZE');
+      addInertTree(source,'home-data/'+entry.name,treeFiles,treeDirs,skipped,budget);
+      files.push(...treeFiles);directories.push(...treeDirs);entry.captured=true;
+      pendingReview.push({name:entry.name,archivePrefix:'home-data/'+entry.name,fileCount:treeFiles.length,bytes:treeFiles.reduce((n,f)=>n+f.bytes,0),complete:skipped.length===0,skippedCount:skipped.length,skipped:skipped.slice(0,PENDING_REVIEW_SKIPPED)});
+      if(skipped.length)layout.missing.push({code:'HOME_DATA_TREE_PARTIAL',tree:entry.name,critical:true});
+    }catch(e){
+      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','ARCHIVE_LIMIT','PENDING_REVIEW_LIMIT','UNSAFE_ARCHIVE_PATH','ENOENT','EACCES','EPERM','EIO','ENOTDIR'].includes(e.code))throw e;
+      entry.captured=false;
+      layout.missing.push({code:e.code==='PENDING_REVIEW_LIMIT'?'HOME_DATA_TREE_TOO_LARGE':'HOME_DATA_TREE_INCOMPLETE',tree:entry.name,critical:true});
+    }
+  }
   for(const r of layout.roots){
     if(!r.exists&&['memory','skills','agents','workspace'].includes(r.kind))continue;
     if(['memory','skills'].includes(r.kind)){
@@ -170,7 +204,7 @@ async function inventory(options){
   }
   const seen=new Set();for(const f of files){C.safeName(f.path);if(seen.has(f.path.toLowerCase()))C.fail('SOURCE_PATH_COLLISION');seen.add(f.path.toLowerCase());}
   const total=files.reduce((n,f)=>n+f.bytes,0);if(total>C.MAX_TOTAL-16*1024*1024||files.length+directories.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
-  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,historicalData,legacyInventory:old};
+  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,historicalData,pendingReview,legacyInventory:old};
 }
 function validate(zip){
   let m;try{m=JSON.parse(zip.get('manifest.json'));}catch{C.fail('INVALID_MANIFEST');}
@@ -210,6 +244,23 @@ function validate(zip){
       trees.add(t.name);
     }
   }
+  // Pending-review trees are inert Home data kept for a later human decision.
+  // They may never overlap the whitelist, and the recorded counts must match
+  // the archive exactly so a rewritten manifest cannot shrink the capture.
+  if(m.pendingReview!==undefined){
+    if(!Array.isArray(m.pendingReview)||m.pendingReview.length>64)C.fail('INVALID_MIGRATION_MANIFEST');
+    const names=new Set();
+    for(const t of m.pendingReview){
+      if(!t||typeof t!=='object'||Array.isArray(t)||typeof t.name!=='string'||!t.name||t.name==='.'||t.name==='..'||USER_HOME.has(t.name)||t.name===LOCAL_SOURCE_HOME||names.has(t.name.toLowerCase()))C.fail('INVALID_MIGRATION_MANIFEST');
+      if(t.archivePrefix!=='home-data/'+t.name||typeof t.complete!=='boolean'||!Number.isSafeInteger(t.fileCount)||t.fileCount<0||!Number.isSafeInteger(t.bytes)||t.bytes<0||!Number.isSafeInteger(t.skippedCount)||t.skippedCount<0||!Array.isArray(t.skipped)||t.skipped.length>PENDING_REVIEW_SKIPPED)C.fail('INVALID_MIGRATION_MANIFEST');
+      if(t.complete!==(t.skippedCount===0))C.fail('INVALID_MIGRATION_MANIFEST');
+      const prefix=t.archivePrefix+'/';
+      for(const s of t.skipped){if(!s||typeof s.path!=='string'||!s.path.startsWith(prefix)||!['link','size','special'].includes(s.kind))C.fail('INVALID_MIGRATION_MANIFEST');try{C.safeName(s.path);}catch{C.fail('INVALID_MIGRATION_MANIFEST');}}
+      const under=m.files.filter(f=>f.path.startsWith(prefix));
+      if(!m.directories.includes(t.archivePrefix)||under.length!==t.fileCount||under.reduce((n,f)=>n+f.bytes,0)!==t.bytes)C.fail('INVALID_MIGRATION_MANIFEST');
+      names.add(t.name.toLowerCase());
+    }
+  }
   if(m.historicalData!==undefined){
     if(!Array.isArray(m.historicalData))C.fail('INVALID_MIGRATION_MANIFEST');
     const seen=new Set();for(const h of m.historicalData){
@@ -225,7 +276,8 @@ function validate(zip){
 async function createBackup(options){
   if(options.confirmPrivate!==true)C.fail('PRIVATE_CONFIRMATION_REQUIRED');if(options.sourceQuiescent!==true)C.fail('QUIESCENT_CONFIRMATION_REQUIRED');
   const {target}=options;C.noLinks(target);C.safeName(path.basename(target));if(path.extname(target).toLowerCase()!=='.zip')C.fail('TARGET_MUST_BE_ZIP');if(fs.existsSync(target))C.fail('TARGET_EXISTS');
-  const parent=path.dirname(target),parentId=C.identity(fs.statSync(parent));options.onPhase?.('scanning');const before=await inventory(options);
+  const parent=path.dirname(target),parentId=C.identity(fs.statSync(parent));const volume=C.probeTarget(parent);if(volume)C.fail(volume);
+  options.onPhase?.('scanning');const before=await inventory(options);
   for(const r of before.roots)if(A.inside(r.path,target)&&r.kind!=='workspace')C.fail('TARGET_INSIDE_SOURCE');
   options.onInventory?.([...new Set(before.files.map(f=>f.source))]);
   const base=await legacy(),dependencyCheck=base.checkPayload(before.legacyInventory.files,{dshVersion:options.dshVersion,probeTask:options.id?{id:options.id,homeDir:options.homeDir}:undefined});
@@ -247,7 +299,7 @@ async function createBackup(options){
     const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
     const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
     const summary=coverageSummary(before.missing,before.excluded);
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,historicalData:before.historicalData,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0,engineeringSourceExcluded:true,installerExcluded:true}};
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,historicalData:before.historicalData,pendingReview:before.pendingReview,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0&&!before.excluded.some(i=>i.needsReview===true),engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;

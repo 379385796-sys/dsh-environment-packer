@@ -1,6 +1,6 @@
 # Build and test
 
-> **Current source: v0.6.3.** The `0.5.0` and v0.6.2 sections below are historical build records for those releases; the same isolated-workspace rules apply. The v0.6.3 section is at the end. Historical artefact hashes are deliberately kept unchanged.
+> **Current source: v0.7.3.** The `0.5.0`, v0.6.2 and v0.6.3 sections below are historical build records for those releases; the same isolated-workspace rules apply. Historical artefact hashes are deliberately kept unchanged.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 

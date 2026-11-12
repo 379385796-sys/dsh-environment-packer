@@ -87,8 +87,10 @@ $timer.Add_Tick({
       $view.backupInfo.Text='源格式：'+$script:plan.format+'；目标实际宿主：'+$script:plan.host.version
       $gapCodes=@($script:plan.issues|Where-Object{$_.critical -ne $false -and $_.code -match '^[A-Z0-9_]{1,64}$'}|ForEach-Object{$_.code}|Select-Object -Unique)
       $gapText=if($gapCodes.Count -gt 0){$gapCodes -join '、'}else{'无'}
-      $view.result.Text=$script:plan|ConvertTo-Json -Depth 100;$view.coverage.Text='文件数：'+$script:plan.archiveIntegrity.files+[Environment]::NewLine+'关键阻断码：'+$gapText+[Environment]::NewLine+'路径映射：'+($script:plan.mappings|ConvertTo-Json -Depth 20)+[Environment]::NewLine+'待处理项目：'+($script:plan.issues|ConvertTo-Json -Depth 20)
-      $view.PlanSummary.Text=('{0:N0} 个文件 · {1:N1} MB · {2} 个安装载荷'+[Environment]::NewLine+'{3} 个工作目录映射 · {4} 项待处理'+[Environment]::NewLine+'目标宿主：DSH {5}') -f $script:plan.archiveIntegrity.files,([double]$script:plan.archiveIntegrity.bytes/1MB),@($script:plan.plugins).Count,@($script:plan.mappings).Count,@($script:plan.issues).Count,$script:plan.host.version
+      $pluginCount=@($script:plan.pluginData).Count
+      $pluginText=if($pluginCount -gt 0){($script:plan.pluginData|ForEach-Object{$_.name}) -join '、'}else{'无'}
+      $view.result.Text=$script:plan|ConvertTo-Json -Depth 100;$view.coverage.Text='文件数：'+$script:plan.archiveIntegrity.files+[Environment]::NewLine+'关键阻断码：'+$gapText+[Environment]::NewLine+'已归类插件数据：'+$pluginText+[Environment]::NewLine+'路径映射：'+($script:plan.mappings|ConvertTo-Json -Depth 20)+[Environment]::NewLine+'待处理项目：'+($script:plan.issues|ConvertTo-Json -Depth 20)
+      $view.PlanSummary.Text=('{0:N0} 个文件 · {1:N1} MB · {2} 个安装载荷'+[Environment]::NewLine+'{3} 个工作目录映射 · {4} 项待处理 · {5} 项插件数据'+[Environment]::NewLine+'目标宿主：DSH {6}') -f $script:plan.archiveIntegrity.files,([double]$script:plan.archiveIntegrity.bytes/1MB),@($script:plan.plugins).Count,@($script:plan.mappings).Count,@($script:plan.issues).Count,$pluginCount,$script:plan.host.version
       $view.PlanDetails.Text=$view.coverage.Text
       $view.targetFeedback.Text='Workspace：'+$script:plan.layout.workspace+[Environment]::NewLine+'自动 Home：'+$script:plan.layout.home
     }else{

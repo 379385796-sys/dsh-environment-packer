@@ -1,4 +1,14 @@
-# Upgrade and rollback
+# Upgrade and rollback / 升级与回退
+
+## v0.7.3 upgrade / rollback notes
+
+Retain the verified v0.7.2 TGZ and the profile's existing pnpm store. Exit DSH normally, install the v0.7.3 TGZ through the official plugin path, then restart and confirm **0.7.3** under **Settings → Environment Recovery**. Existing archives, plugin data and unrelated plugin versions are not rewritten. To roll back, exit DSH and reinstall the retained v0.7.2 TGZ through the same official path; the Profile, archives and plugin data remain in place.
+
+保留已验证的 v0.7.2 TGZ 与现有 Profile 的 pnpm store。正常退出 DSH，通过官方插件安装路径安装 v0.7.3 TGZ，重启后在 **设置 → 环境恢复** 确认版本为 **0.7.3**。现有归档、插件数据与其他插件版本不会被改写。回退时正常退出 DSH，用同一官方路径重新安装保留的 v0.7.2 TGZ；Profile、归档与插件数据保持原位。
+
+v0.7.3 does not change recovery/2, /3 or /4 formats. A v0.7.2 archive remains readable. Its three known plugin `pendingReview` entries are resolved during planning as `pluginData`; unknown or incomplete entries still map to `pending-review/` and stay blocking.
+
+v0.7.3 不改变 recovery/2、/3、/4 格式。v0.7.2 归档仍可读取；其中三个已知插件的 `pendingReview` 条目在规划时解析为 `pluginData`，未知或不完整条目仍映射到 `pending-review/` 并保持阻断。
 
 ## v0.7.1 upgrade / rollback notes
 

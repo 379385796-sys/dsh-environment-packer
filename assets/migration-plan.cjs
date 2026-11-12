@@ -26,10 +26,10 @@ function compatibility(manifest,packages,host,readSource){
   for(const p of packages){try{require('./provider-runtime.cjs').validateProviderRuntime(p.manifest,{node:proof.node,electron:proof.electron,platform:proof.platform,arch:proof.arch},host.version);}catch{issues.push({code:'PLUGIN_RUNTIME_MISMATCH',plugin:p.manifest.name,state:'blocked',critical:true});}}
   for(const p of packages)if(/^@deepseek-ai\/dsh(?:-|$)/.test(p.manifest.name)&&proof.providers.some(v=>v.name===p.manifest.name))issues.push({code:'HOST_PACKAGE_SHADOWING',plugin:p.manifest.name,state:'unknown',critical:true});
   if(manifest.sourceRuntime.platform!==proof.platform||manifest.sourceRuntime.arch!==proof.arch)issues.push({code:'PLATFORM_OR_ARCH_CHANGED',state:'blocked',critical:true});
-  // Prebuilt binaries inside preserved local source trees are inert data, not
-  // environment native modules; they must not create a runtime gate.
-  const sourcePrefixes=(manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
-  const native=manifest.files.filter(f=>f.path.endsWith('.node')&&!sourcePrefixes.some(prefix=>f.path.startsWith(prefix))).map(f=>({path:f.path,state:manifest.sourceRuntime.nodeModules===proof.nodeModules?'requires-load-test':'unknown'}));
+  // Prebuilt binaries inside preserved source trees and inert plugin/pending
+  // data are not environment native modules; they must not create a runtime gate.
+  const inertPrefixes=[...(manifest.sourceTrees||[]),...(manifest.pluginHomes||[]),...(manifest.pendingReview||[])].map(t=>t.archivePrefix+'/');
+  const native=manifest.files.filter(f=>f.path.endsWith('.node')&&!inertPrefixes.some(prefix=>f.path.startsWith(prefix))).map(f=>({path:f.path,state:manifest.sourceRuntime.nodeModules===proof.nodeModules?'requires-load-test':'unknown'}));
   if(native.some(n=>n.state==='unknown'))issues.push({code:'NATIVE_RUNTIME_UNVERIFIED',state:'unknown',critical:true});
   if(host.capabilities.sessionVersion!==4||!host.capabilities.zstd||!host.capabilities.projectKeyV1||!host.capabilities.workspaceV2)issues.push({code:'TARGET_DATA_CAPABILITY_UNKNOWN',state:'unknown',critical:true});
   // Version differences themselves never add an issue. Declared engines/peers still apply.
@@ -50,12 +50,15 @@ async function scanData(arc){
   // Preserved local source trees are inert data, not environment datasets.
   // Never interpret their .db/.json/.md files as storage, database or skills.
   const sourcePrefixes=(arc.manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
+  // Known plugin Home data is inert application data, not environment storage.
+  // Never interpret its .db/.json/.md files as live databases, storage or skills.
+  const pluginPrefixes=(arc.manifest.pluginHomes||[]).map(t=>t.archivePrefix+'/');
   // Pending-review Home trees are inert copies awaiting a human decision: never
   // interpret their files as live storage, databases or skills.
   const pendingPrefixes=(arc.manifest.pendingReview||[]).map(t=>t.archivePrefix+'/');
   function workspace(p){if(!roots.some(r=>r.kind==='workspace'&&A.canonical(r.path)===A.canonical(p)))roots.push({id:'workspace-'+A.id(p),kind:'workspace',path:p,exists:false});}
   for(const f of files){
-    if(sourcePrefixes.some(prefix=>f.path.startsWith(prefix))||pendingPrefixes.some(prefix=>f.path.startsWith(prefix)))continue;
+    if(sourcePrefixes.some(prefix=>f.path.startsWith(prefix))||pluginPrefixes.some(prefix=>f.path.startsWith(prefix))||pendingPrefixes.some(prefix=>f.path.startsWith(prefix)))continue;
     if(f.path.startsWith('home-data/sessions/')&&/\.jsonl(?:\.zstd)?$/.test(f.path)){
       const bytes=get(arc,f),{header}=A.decodeSession(bytes,f.path);for(const cwd of A.sessionPaths(bytes,f.path))workspace(cwd);
       datasets.push({path:f.path,adapter:'session-v4',sessionId:header.id,version:header.version,state:header.version===4?'converted':'unknown',critical:true});if(header.version!==4)issues.push({code:'SESSION_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
@@ -103,14 +106,33 @@ async function plan({zipFile,installation,workspace}){
     const compatibilityResult=compatibility(arc.manifest,packages,host,n=>byPath.has(n)?get(arc,byPath.get(n)):undefined);
     const planId=digest({zipSHA256,host:host.proof,workspace:path.resolve(workspace)}),layout=targetLayout(workspace,planId),map=A.mappings(data.roots,layout.workspace);
     const external=data.roots.filter(r=>['memory','skills','agents'].includes(r.kind)).map(r=>({id:r.id,kind:r.kind,owners:r.owners||[],workspaceRelative:r.workspaceRelative===true,from:r.path,to:r.kind==='agents'?layout.agents:r.workspaceRelative?A.mapPath(r.path,map):path.join(layout.state,'data',r.id)}));
-    const issues=[...compatibilityResult.issues,...data.issues,...(arc.manifest.coverage.missing||[]).map(i=>({...i,state:'unknown'})),...(arc.manifest.coverage.excluded||[]).filter(i=>i.needsReview).map(i=>({code:'HOME_ITEM_UNCLASSIFIED',name:i.name,state:'unknown',critical:true}))];
+    // Known plugin Home data is restored to the same Home path. New archives
+    // declare it explicitly; pre-0.7.3 archives recorded it as pending review, so
+    // the same registry plus the archived marker files resolves them here. This
+    // is a reclassification of captured user data, not a bypass: complete marker
+    // matches are required, and anything else stays blocked.
+    const pluginData=[],classified=new Set();
+    for(const t of arc.manifest.pluginHomes||[])pluginData.push({name:t.name,owner:t.owner??null,evidence:t.evidence,to:path.join(layout.home,t.name),files:t.fileCount,bytes:t.bytes,activation:'data-only',source:'manifest-classification'});
+    for(const t of arc.manifest.pendingReview||[]){
+      if(t.complete!==true)continue;
+      if((arc.manifest.coverage.missing||[]).some(i=>i&&i.tree===t.name))continue;
+      const record=R.classifyPluginHome(t.name,rel=>{const file=byPath.get(t.archivePrefix+'/'+rel);if(!file)return null;try{return get(arc,file);}catch{return null;}});
+      if(!record)continue;
+      classified.add(t.name);
+      pluginData.push({name:t.name,owner:record.owner??null,evidence:record.evidence,to:path.join(layout.home,t.name),files:t.fileCount,bytes:t.bytes,activation:'data-only',source:'legacy-pending-review'});
+    }
+    const classifiedNames=new Set(pluginData.map(t=>t.name));
+    const unresolvedPending=(arc.manifest.pendingReview||[]).filter(t=>!classified.has(t.name));
+    const issues=[...compatibilityResult.issues,...data.issues,...(arc.manifest.coverage.missing||[]).map(i=>({...i,state:'unknown'})),...(arc.manifest.coverage.excluded||[]).filter(i=>i.needsReview&&!classifiedNames.has(i.name)).map(i=>({code:'HOME_ITEM_UNCLASSIFIED',name:i.name,state:'unknown',critical:true}))];
     // Source trees are restored into the new Home as data only. They are never
     // activated as plugins and never rewritten as configuration.
     const sourceTrees=(arc.manifest.sourceTrees||[]).map(t=>({name:t.name,to:path.join(layout.home,t.restorePath),files:t.fileCount,bytes:t.bytes,activation:'data-only'}));
     // Unclassified Home data is restored outside the new DSH home: preserved
     // for review, never activated as runtime state.
-    const pendingReview=(arc.manifest.pendingReview||[]).map(t=>({name:t.name,to:path.join(layout.state,'pending-review',t.name),files:t.fileCount,bytes:t.bytes,skipped:t.skippedCount||0,activation:'pending-review'}));
-    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),sourceTrees,pendingReview,datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
+    const pendingReview=unresolvedPending.map(t=>({name:t.name,to:path.join(layout.state,'pending-review',t.name),files:t.fileCount,bytes:t.bytes,skipped:t.skippedCount||0,activation:'pending-review'}));
+    const coverageReview={recorded:arc.manifest.coverage.summary?{state:arc.manifest.coverage.summary.state,criticalCount:arc.manifest.coverage.summary.criticalCount,criticalCodes:arc.manifest.coverage.summary.criticalCodes,recoveryBlocked:arc.manifest.coverage.summary.recoveryBlocked}:null,classified:pluginData.map(t=>({name:t.name,owner:t.owner,evidence:t.evidence,files:t.files,bytes:t.bytes,source:t.source})),unresolved:unresolvedPending.map(t=>({name:t.name,files:t.fileCount,bytes:t.bytes,complete:t.complete,skipped:t.skippedCount||0}))};
+    const result={planSchemaVersion:1,mode:'migrate',planId,zipFile:path.resolve(zipFile),zipSHA256,format:arc.manifest.format,archiveIntegrity:{state:'valid',sha256:zipSHA256,files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,coverageReview,host,layout,mappings:map,externalRoots:external,tools:(arc.manifest.tools||[]).map(t=>({...t,to:path.join(layout.state,t.archivePath)})),sourceTrees,pendingReview,pluginData,datasets:data.datasets,plugins:packages.map(p=>({path:p.path,name:p.manifest.name,version:p.manifest.version,manifestSHA256:digest(p.manifest)})),native:compatibilityResult.native,requirements:compatibilityResult.requirements,optionalMissing:compatibilityResult.optionalMissing,issues,actions:['preserve-archive','stage-files','map-structured-paths','bind-profile-package-sources','verify-data','isolated-start-restart','publish-launcher'],canApply:!issues.some(i=>i.state==='blocked')&&!hasUnresolvedCritical(issues),canCommit:false,spaceBudgetBytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)*3+128*1024*1024};
+    if(pluginData.length)result.actions.push('preserve-classified-plugin-data');
     if(pendingReview.length)result.actions.push('preserve-pending-review-data');
     result.expectedSkills=data.skills.map(s=>({...s,cwd:s.path.startsWith('workspaces/')?map.find(r=>r.id===s.path.split('/')[1])?.to||layout.workspace:layout.workspace}));
     result.requiresPreferenceImport=arc.manifest.files.some(f=>f.path==='preferences/dsh-chat-comfort.settings.v1.json');
@@ -133,6 +155,8 @@ function validatePlan(p){
   for(const [key,expected]of Object.entries({state:expectedState,parent:path.dirname(l.workspace),home:path.join(expectedState,'home'),profile:path.join(expectedState,'home/profiles/desktop'),agents:path.join(expectedState,'agents'),userData:path.join(expectedState,'electron')}))if(l[key]!==expected)C.fail('PLAN_LAYOUT_INVALID');
   for(const r of p.mappings)if(!A.inside(l.workspace,r.to))C.fail('PLAN_LAYOUT_INVALID');for(const r of p.externalRoots)if(!A.inside(l.state,r.to)&&!(r.workspaceRelative&&A.inside(l.workspace,r.to)))C.fail('PLAN_LAYOUT_INVALID');
   for(const t of p.sourceTrees||[])if(t.to!==path.join(l.home,t.name)||!A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');
-  for(const t of p.pendingReview||[])if(t.to!==path.join(l.state,'pending-review',t.name)||!A.inside(l.state,t.to)||A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');
+  const pluginNames=new Set();
+  for(const t of p.pluginData||[]){if(typeof t.name!=='string'||!t.name||t.name==='.'||t.name==='..'||/[\/\\]/.test(t.name)||pluginNames.has(t.name.toLowerCase())||t.to!==path.join(l.home,t.name)||!A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');pluginNames.add(t.name.toLowerCase());}
+  for(const t of p.pendingReview||[])if(t.to!==path.join(l.state,'pending-review',t.name)||!A.inside(l.state,t.to)||A.inside(l.home,t.to)||pluginNames.has(t.name.toLowerCase()))C.fail('PLAN_LAYOUT_INVALID');
 }
 module.exports={stable,digest,get,hasUnresolvedCritical,packageRecords,compatibility,targetLayout,scanData,inspect,plan,validatePlan};

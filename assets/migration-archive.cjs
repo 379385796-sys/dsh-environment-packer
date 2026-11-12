@@ -40,6 +40,32 @@ const LOCAL_SOURCE_EXCLUDED=new Set(['node_modules']);
 // Preserve historical snapshots outside Home; live values cannot reconstruct history.
 const CACHE_BACKUP=/^(\.dshw-(?:usage|size|turn)\.json)\..+\.bak$/i;
 const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','AGENTS.md','.credentials.yaml','.credentials.yml','settings.yaml','settings.yaml.imported','cordis.patch.yml','.env','dsh-claude-style','rewind-snapshots','skills-manager','llm-deepseek','archive-manager','aik_auto_memory_use','dsh-market','dsh-builtin-browser-host','models','emoji-packs','whale-audio','whale-bubble-imgs','whale-roles','.dshw-size.json','.dshw-turn.json','.dshw-usage.json']);
+// Home data owned by known plugins. These are user data, not unknown cache:
+// they are captured in full and restored to the same Home path. A generic name
+// such as `music` is classified only when its documented marker files exist,
+// so an unrelated directory with the same name still goes to pending review.
+const KNOWN_PLUGIN_HOME=new Map([
+  ['.dsh-paper-reader',{owner:'@ggboy123/dsh-paper-reader',evidence:'directory-name'}],
+  ['dsham-move-backup',{owner:'@michengai/dsh-archive-manager',evidence:'directory-name'}],
+  ['music',{owner:null,evidence:'music-settings-v2'}]
+]);
+function jsonObject(bytes){try{const value=JSON.parse(bytes.toString('utf8'));return value&&typeof value==='object'&&!Array.isArray(value)?value:null;}catch{return null;}}
+// `read(relative)` returns a Buffer for the marker file, or null when absent.
+function classifyPluginHome(name,read){
+  const record=KNOWN_PLUGIN_HOME.get(name);if(!record)return null;
+  if(record.evidence==='theme-json'){if(!jsonObject(read('theme.json')))return null;}
+  else if(record.evidence==='music-settings-v2'){
+    const settings=jsonObject(read('settings.json')),stats=jsonObject(read('stats.json'));
+    if(!settings||!Array.isArray(settings.roots))return null;
+    if(!stats||stats.version!==2||!stats.tracks||typeof stats.tracks!=='object'||Array.isArray(stats.tracks))return null;
+  }
+  return record;
+}
+function pluginHomeAt(name,dir){
+  let stat;try{stat=fs.lstatSync(dir);}catch{return null;}
+  if(!stat.isDirectory())return null;
+  return classifyPluginHome(name,rel=>{try{return C.readStable(path.join(dir,rel));}catch{return null;}});
+}
 async function legacy(){return import(pathToFileURL(path.join(__dirname,'../lib/private-backup.js')).href);}
 function fileRecord(source,relative){const s=fs.lstatSync(source);if(!s.isFile()||s.isSymbolicLink()||s.size>C.MAX_FILE)C.fail('SOURCE_TYPE_OR_SIZE');return {path:relative,source,identity:C.identity(s),bytes:s.size,mtime:s.mtimeMs,ctime:s.ctimeMs};}
 function addTree(source,relative,files,dirs){
@@ -92,27 +118,53 @@ async function discover({homeDir,profileDir,workspaceRoot,agentsDir,clientPrefer
   }
   const agents=agentsDir||process.env.DSH_AGENTS_HOME||path.join(os.homedir(),'.agents');if(fs.existsSync(path.join(agents,'skills')))root('agents',agents);
   for(const r of roots.filter(r=>['memory','skills'].includes(r.kind)))if(!r.exists&&!r.defaultRoot)missing.push({code:'EXTERNAL_DATA_MISSING',root:r.id,critical:true});
+  const pluginHome=new Map();
+  for(const name of KNOWN_PLUGIN_HOME.keys()){
+    if(USER_HOME.has(name))continue;
+    const record=pluginHomeAt(name,path.join(homeDir,name));
+    if(record)pluginHome.set(name,record);
+  }
   for(const name of fs.readdirSync(homeDir).sort())if(!USER_HOME.has(name)){
     const captured=roots.some(r=>['memory','skills'].includes(r.kind)&&A.canonical(r.path)===A.canonical(path.join(homeDir,name)));
-    const historical=CACHE_BACKUP.test(name);
+    const plugin=pluginHome.get(name),historical=CACHE_BACKUP.test(name);
     const reason=captured?'captured-as-data-root'
+      :plugin?'captured-plugin-data'
       :name===LOCAL_SOURCE_HOME?'captured-local-plugin-source'
       :OMIT_HOME.has(name)||name.startsWith('.deployment-rollback')?'runtime-cache-history-or-task'
       :historical?'captured-historical-data'
       :'unclassified-home-entry';
-    excluded.push({name,reason,needsReview:!captured&&name!==LOCAL_SOURCE_HOME&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')&&!historical});
+    const entry={name,reason,needsReview:!captured&&!plugin&&name!==LOCAL_SOURCE_HOME&&!OMIT_HOME.has(name)&&!name.startsWith('.deployment-rollback')&&!historical};
+    if(plugin){entry.pluginOwner=plugin.owner;entry.pluginEvidence=plugin.evidence;}
+    excluded.push(entry);
   }
   const capture=classifyClientPreferences(clientPreferences),preferences=capture.preferences;
   // An absent field is a real, critical capture gap. Data preservation still
   // proceeds; it must never be reported as a successful capture.
   if(capture.state==='absent'&&fs.existsSync(path.join(profileDir,'node_modules/dsh-chat-comfort/package.json')))missing.push({code:'CLIENT_PREFERENCE_NOT_CAPTURED',critical:true});
-  return {roots,missing,excluded,preferences,capture,mnemonCliPaths};
+  return {roots,missing,excluded,preferences,capture,mnemonCliPaths,pluginHome:[...pluginHome.keys()]};
 }
 async function inventory(options){
   const base=await legacy(),layout=await discover(options),old=base.inventory(options.profileDir,options.homeDir);
   const files=old.files.map(f=>({...f,path:f.path.startsWith('profile/')?'profiles/desktop/'+f.path.slice(8):'home-data/'+f.path.slice(5)}));
   const directories=old.directories.map(n=>n.startsWith('profile/')?'profiles/desktop/'+n.slice(8):'home-data/'+n.slice(5));
   for(const name of [...USER_HOME].sort())if(!base.HOME_SCOPE.includes(name)&&fs.existsSync(path.join(options.homeDir,name)))addTree(path.join(options.homeDir,name),'home-data/'+name,files,directories);
+  // Known plugin data is captured in full as user data. A read failure is a
+  // critical coverage gap, not an archive-wide abort: other readable data must
+  // still be preserved, and restore planning will refuse the incomplete tree.
+  const pluginHomes=[];
+  for(const entry of layout.excluded.filter(e=>e.reason==='captured-plugin-data')){
+    const source=path.join(options.homeDir,entry.name),treeFiles=[],treeDirs=[];
+    try{
+      if(!fs.lstatSync(source).isDirectory())C.fail('SOURCE_TYPE_OR_SIZE');
+      addTree(source,'home-data/'+entry.name,treeFiles,treeDirs);
+      files.push(...treeFiles);directories.push(...treeDirs);entry.captured=true;
+      pluginHomes.push({name:entry.name,owner:entry.pluginOwner??null,evidence:entry.pluginEvidence,archivePrefix:'home-data/'+entry.name,fileCount:treeFiles.length,bytes:treeFiles.reduce((n,f)=>n+f.bytes,0),complete:true});
+    }catch(e){
+      if(!['REPARSE_REFUSED','SOURCE_TYPE_OR_SIZE','ARCHIVE_LIMIT','UNSAFE_ARCHIVE_PATH','ENOENT','EACCES','EPERM','EIO','ENOTDIR'].includes(e.code))throw e;
+      entry.captured=false;
+      layout.missing.push({code:'PLUGIN_HOME_DATA_INCOMPLETE',tree:entry.name,critical:true});
+    }
+  }
   // Local plugin sources are captured as inert data. A failure inside that tree
   // is reported as a critical coverage gap instead of aborting the whole
   // archive: readable environment data must still be preserved.
@@ -204,7 +256,7 @@ async function inventory(options){
   }
   const seen=new Set();for(const f of files){C.safeName(f.path);if(seen.has(f.path.toLowerCase()))C.fail('SOURCE_PATH_COLLISION');seen.add(f.path.toLowerCase());}
   const total=files.reduce((n,f)=>n+f.bytes,0);if(total>C.MAX_TOTAL-16*1024*1024||files.length+directories.length>=C.MAX_ENTRIES)C.fail('ARCHIVE_LIMIT');
-  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,historicalData,pendingReview,legacyInventory:old};
+  return {...layout,files:files.sort((a,b)=>a.path.localeCompare(b.path,'en')),directories:[...new Set(directories)].sort(),packages,tools,sourceTrees,historicalData,pendingReview,pluginHomes,legacyInventory:old};
 }
 function validate(zip){
   let m;try{m=JSON.parse(zip.get('manifest.json'));}catch{C.fail('INVALID_MANIFEST');}
@@ -261,6 +313,24 @@ function validate(zip){
       names.add(t.name.toLowerCase());
     }
   }
+  // Known plugin Home data is an optional, explicit classification. It must
+  // name a documented plugin area, carry the recorded owner/evidence and match
+  // the archive byte counts exactly, so a rewritten manifest cannot turn an
+  // arbitrary tree into activated Home data.
+  if(m.pluginHomes!==undefined){
+    if(!Array.isArray(m.pluginHomes)||m.pluginHomes.length>16)C.fail('INVALID_MIGRATION_MANIFEST');
+    const names=new Set();
+    for(const t of m.pluginHomes){
+      if(!t||typeof t!=='object'||Array.isArray(t)||typeof t.name!=='string'||!KNOWN_PLUGIN_HOME.has(t.name)||USER_HOME.has(t.name)||t.name===LOCAL_SOURCE_HOME||names.has(t.name.toLowerCase()))C.fail('INVALID_MIGRATION_MANIFEST');
+      const record=KNOWN_PLUGIN_HOME.get(t.name);
+      if(t.archivePrefix!=='home-data/'+t.name||t.complete!==true||t.owner!==(record.owner??null)||t.evidence!==record.evidence||!Number.isSafeInteger(t.fileCount)||t.fileCount<0||!Number.isSafeInteger(t.bytes)||t.bytes<0)C.fail('INVALID_MIGRATION_MANIFEST');
+      const prefix=t.archivePrefix+'/',under=m.files.filter(f=>f.path.startsWith(prefix));
+      if(!m.directories.includes(t.archivePrefix)||m.files.some(f=>f.path===t.archivePrefix)||under.length!==t.fileCount||under.reduce((n,f)=>n+f.bytes,0)!==t.bytes)C.fail('INVALID_MIGRATION_MANIFEST');
+      if((m.coverage.excluded||[]).some(i=>i&&i.name===t.name&&i.needsReview===true))C.fail('INVALID_MIGRATION_MANIFEST');
+      names.add(t.name.toLowerCase());
+    }
+    for(const t of m.pendingReview||[])if(names.has(t.name.toLowerCase()))C.fail('INVALID_MIGRATION_MANIFEST');
+  }
   if(m.historicalData!==undefined){
     if(!Array.isArray(m.historicalData))C.fail('INVALID_MIGRATION_MANIFEST');
     const seen=new Set();for(const h of m.historicalData){
@@ -299,7 +369,7 @@ async function createBackup(options){
     const recordedDependencyIssues=dependencyIssues.slice(0,MAX_RECORDED_DEPENDENCY_ISSUES);
     const compatibility={dependencyChecked:true,dependencyIssueCount:dependencyIssues.length,dependencyIssues:recordedDependencyIssues,truncated:dependencyIssues.length>recordedDependencyIssues.length,optionalMissing:dependencyCheck.optionalMissing.slice(0,100),sourceFilesVerified:true};
     const summary=coverageSummary(before.missing,before.excluded);
-    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,historicalData:before.historicalData,pendingReview:before.pendingReview,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0&&!before.excluded.some(i=>i.needsReview===true),engineeringSourceExcluded:true,installerExcluded:true}};
+    const m={format:FORMAT,schemaVersion:1,mode:'environment-migration',archiveId:crypto.randomUUID(),producerVersion:JSON.parse(C.readStable(path.join(__dirname,'../package.json'))).version,createdAt:new Date().toISOString(),encrypted:false,sourceRuntime:{dshVersion:options.dshVersion,platform:process.platform,arch:process.arch,node:process.versions.node,nodeMajor:process.versions.node.split('.')[0],nodeModules:process.versions.modules,...(dependencyCheck.hostRequirements?{hostEvidence:dependencyCheck.hostRequirements}:{})},compatibility,roots:before.roots,packages:before.packages,tools:before.tools,sourceTrees:before.sourceTrees,pluginHomes:before.pluginHomes,historicalData:before.historicalData,pendingReview:before.pendingReview,dataSets,files:records,directories:before.directories,coverage:{missing:before.missing,excluded:before.excluded,summary,completeWithinDeclaredScope:before.missing.length===0&&!before.excluded.some(i=>i.needsReview===true),engineeringSourceExcluded:true,installerExcluded:true}};
     writer.add('manifest.json',Buffer.from(JSON.stringify(m,null,2)+'\n'));writer.finish();options.onPhase?.('verifying');let z=C.openZip(temp);try{validate(z);}finally{z.close();}
     if(options.signal?.aborted)C.fail('BACKUP_ABORTED');if(dependencyCheck.hostRequirements)require('./host-proof.cjs').verifyHost(dependencyCheck.hostRequirements,options.dshVersion,options.id?{id:options.id,homeDir:options.homeDir}:undefined);options.beforeCommit?.();C.noLinks(parent);if(C.identity(fs.statSync(parent))!==parentId)C.fail('TARGET_IDENTITY_CHANGED');
     z=C.openZip(temp);let sha256;try{sha256=z.fingerprint();}finally{z.close();}tempId=C.identity(fs.statSync(temp));fs.linkSync(temp,target);committed=true;
@@ -307,4 +377,4 @@ async function createBackup(options){
   }catch(e){writer?.close();if(!options.preserveFailureArtifacts){if(committed&&C.identity(fs.lstatSync(target))===tempId)fs.unlinkSync(target);if(fs.existsSync(temp))fs.unlinkSync(temp);}throw e;}
 }
 function readArchive(file){const zip=C.openZip(file);try{const head=JSON.parse(zip.get('manifest.json'));if(head.format===FORMAT)return {zip,manifest:validate(zip),legacy:false};const m=require('./verify-private.cjs').validateArchive(zip);return {zip,manifest:{format:m.format,schemaVersion:0,mode:'environment-migration',producerVersion:m.packerVersion,sourceRuntime:{...m.compatibility,nodeModules:m.compatibility.nodeModules,nodeMajor:m.compatibility.nodeMajor},roots:[{id:'home',kind:'home',path:'Z:\\legacy-unknown-home'},{id:'profile',kind:'profile',path:'Z:\\legacy-unknown-home\\profiles\\desktop'}],files:m.files.map(f=>({...f,path:f.path.startsWith('profile/')?'profiles/desktop/'+f.path.slice(8):'home-data/'+f.path.slice(5),archivePath:f.path})),directories:m.directories.map(n=>n.startsWith('profile/')?'profiles/desktop/'+n.slice(8):'home-data/'+n.slice(5)),packages:[],coverage:{missing:[{code:'LEGACY_COVERAGE_INCOMPLETE',critical:true}],excluded:m.exclusions||[]}},legacy:true};}catch(e){zip.close();throw e;}}
-module.exports={FORMAT,classifyClientPreferences,coverageSummary,discover,inventory,createBackup,validate,readArchive};
+module.exports={FORMAT,classifyClientPreferences,classifyPluginHome,KNOWN_PLUGIN_HOME,coverageSummary,discover,inventory,createBackup,validate,readArchive};

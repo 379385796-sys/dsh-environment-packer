@@ -31,7 +31,7 @@ function fixture(name,{unknown=false,liveCache=true,sources=true}={}){
   }
   if(liveCache)write(path.join(home,'.dshw-usage.json'),{date:'2026-10-18',lastBalance:null,todayUsage:1,history:{},events:[]});
   write(path.join(home,'.dshw-usage.json.before-recharge-fix.bak'),{date:'2026-10-16',lastBalance:null,todayUsage:1,history:{},events:[]});
-  if(unknown)write(path.join(home,'mystery.bin'),Buffer.from([1,2,3]));
+  if(unknown){fs.mkdirSync(path.join(home,'mystery-data'));write(path.join(home,'mystery-data/secret.bin'),Buffer.from([1,2,3]));}
   return {dir,home,profile};
 }
 
@@ -62,7 +62,7 @@ function fixture(name,{unknown=false,liveCache=true,sources=true}={}){
     assert.deepEqual(backup.coverageSummary.criticalCodes,['HOME_ITEM_UNCLASSIFIED']);
   });
   ok('an unrelated unknown home entry still stays a critical, conservative warning',()=>{
-    const entry=backup.manifest.coverage.excluded.find(i=>i.name==='mystery.bin');
+    const entry=backup.manifest.coverage.excluded.find(i=>i.name==='mystery-data');
     assert(entry);assert.equal(entry.reason,'unclassified-home-entry');assert.equal(entry.needsReview,true);
     assert.equal(backup.manifest.coverage.summary.state,'critical-gaps');
     assert.equal(backup.manifest.coverage.summary.recoveryBlocked,true);

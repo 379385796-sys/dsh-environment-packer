@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.3 — 2026-11-12
+
+- 修复已知插件 Home 数据被误判：`.dsh-paper-reader`（`@ggboy123/dsh-paper-reader`）、`dsham-move-backup`（`@michengai/dsh-archive-manager`）与 `music`（按 `settings.roots` + `stats.version:2` 识别）现在作为 `captured-plugin-data` 采集，清单新增可选 `pluginHomes`，记录归属、证据、文件数与字节数；新备份不再因这三项报 `HOME_ITEM_UNCLASSIFIED`。
+- 旧 /4 归档兼容：规划器把 `pendingReview` 中完整、内容标记匹配的已知插件数据解析为 `pluginData`，恢复到新 Home 的原路径；未识别、不完整或计数不符的条目仍留在 `pending-review/` 并保持阻断。
+- 透明记录：计划新增 `coverageReview`，并列显示归档记录的阻断摘要、已归类插件数据与未解决项；不再为了“看起来能恢复”而改写归档自带的 `recoveryBlocked`。
+- 安全检查保持：未知顶层目录仍为 `HOME_ITEM_UNCLASSIFIED` critical；插件数据采集失败记为 `PLUGIN_HOME_DATA_INCOMPLETE` critical；`pluginData` 目标必须严格等于 `<新Home>/<name>`，修复规划仍以 `canApply`、critical issue 与 `validatePlan` 共同把关。
+- 插件数据不参与 live storage/database/skill 扫描，也不被 memory workspace-ID 重写；恢复后按 `data-only` 落盘。
+- 新增定向测试 `v073-plugin-home.cjs`（9 checks，合成数据）；`audit-fix.cjs` 11 checks 保持通过。真实 1.05GB / 43,331 文件归档只读规划把 3 个 `HOME_ITEM_UNCLASSIFIED` 归零，未新增 issue；因归档中浏览器 peer 无法自证与 `react` 传递依赖缺失，仍保留 21 个 critical、`canApply=false`，不执行覆盖式恢复。详见 [v0.7.3 说明](docs/RELEASE-0.7.3.md)。
+- 不改变 recovery/2、/3、/4 格式、verify/commit 门禁与既有安全限制。
+
 ## 0.7.2 — 2026-11-12
 
 - 未知 Home 数据保全：白名单外的顶层目录不再只记录不采集，而是作为 `pendingReview` 惰性树采集到 `home-data/<name>/`，清单记录文件数、字节数与跳过项（链接/超大/特殊文件）。`needsReview` 与恢复阻断保持不变；恢复时映射到 `<state>/pending-review/<name>`，不写入新 Home、不激活为运行时状态。

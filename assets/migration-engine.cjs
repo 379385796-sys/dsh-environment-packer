@@ -118,10 +118,10 @@ function childEnvironment(p){
 }
 async function boot(p,round,{onReady,port=0}={}){
   const file=path.join(p.layout.state,'logs','runtime-'+round),out=fs.openSync(file+'.stdout.log','wx',0o600),err=fs.openSync(file+'.stderr.log','wx',0o600);
-  let child,output='',errorOutput='',ready,loaded=false,dataVerified=false,dataChecks=[],exited=false,exitCode;
+  let child,output='',errorOutput='',ready,loaded=false,dataVerified=false,dataChecks=[],dataStorage=[],exited=false,exitCode;
   try{
     child=spawn(p.host.exe,['--expose-internals',path.join(__dirname,'migration-runtime.cjs'),Buffer.from(JSON.stringify({layout:p.layout,installation:p.host.installation,native:p.native,tools:p.tools,port,expectedSkills:p.expectedSkills||[],expectedStorage:p.expectedStorage||[],expectedSessionIds:(p.datasets||[]).filter(d=>d.adapter==='session-v4').map(d=>d.sessionId),requiresPreferenceImport:p.requiresPreferenceImport===true})).toString('base64')],{cwd:p.layout.workspace,env:childEnvironment(p),windowsHide:true,stdio:['ignore','pipe','pipe','ipc']});
-    child.stdout.on('data',b=>{fs.writeSync(out,b);output+=b.toString();const m=output.match(/dsh web: (http:\/\/[^\s]+)/);if(m)ready=m[1];});child.stderr.on('data',b=>{fs.writeSync(err,b);errorOutput+=b.toString();});child.on('message',m=>{if(m?.type==='native-loaded')loaded=true;if(m?.type==='data-verified'){dataVerified=true;dataChecks=m.checks||[];}if(m?.type==='failed')errorOutput+='\n'+m.code;});
+    child.stdout.on('data',b=>{fs.writeSync(out,b);output+=b.toString();const m=output.match(/dsh web: (http:\/\/[^\s]+)/);if(m)ready=m[1];});child.stderr.on('data',b=>{fs.writeSync(err,b);errorOutput+=b.toString();});child.on('message',m=>{if(m?.type==='native-loaded')loaded=true;if(m?.type==='data-verified'){dataVerified=true;dataChecks=m.checks||[];dataStorage=Array.isArray(m.storage)?m.storage:[];}if(m?.type==='failed')errorOutput+='\n'+m.code;});
     child.on('exit',c=>{exited=true;exitCode=c;});let spawnError;child.on('error',e=>{spawnError=e;});
     const deadline=Date.now()+60000;while(!ready||!dataVerified){if(spawnError||exited)C.fail('RUNTIME_BOOT_FAILED');if(Date.now()>deadline)C.fail('RUNTIME_BOOT_TIMEOUT');await new Promise(r=>setTimeout(r,100));}
     if(!loaded)C.fail('NATIVE_LOAD_UNVERIFIED');const url=new URL(ready);if(!['127.0.0.1','localhost'].includes(url.hostname))C.fail('RUNTIME_NONLOCAL_URL');
@@ -141,7 +141,7 @@ async function boot(p,round,{onReady,port=0}={}){
     }
     child.send({type:'shutdown'});const stop=Date.now()+15000;while(!exited&&Date.now()<stop)await new Promise(r=>setTimeout(r,100));if(!exited||exitCode!==0)C.fail('RUNTIME_SHUTDOWN_FAILED');
     if(/skipped bundle|entries did not activate|failed to load|unhandled|RUNTIME_BOOT_FAILED|ISOLATED_.*REFUSED/i.test(errorOutput))C.fail('RUNTIME_PLUGIN_FAILURE');
-    return {round,status:'passed',checks,normalShutdown:true,exitCode};
+    return {round,status:'passed',checks,normalShutdown:true,exitCode,storage:dataStorage};
   }finally{if(child&&!exited){child.kill();await new Promise(r=>{child.once('exit',r);setTimeout(r,5000);});}fs.closeSync(out);fs.closeSync(err);if(child&&!exited)C.fail('RUNTIME_EXIT_UNCONFIRMED');}
 }
 async function verifyCore(p,guard){

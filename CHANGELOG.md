@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.5 — 2026-11-17
+
+- 恢复验证不再把「启动时没有插件打开该存储域」直接判成 `STORAGE_OWNER_UNAVAILABLE`。真实归档里 `archive_manager_favorites` 与 `token_total_history` 的属主在启动阶段本来就不会打开域（懒加载或插件未安装），而 `dsh_prompt` 的打开是插件 `apply()` 里的异步初始化，`loader.await()` 返回时可能还在进行中。现在先证明介质本身（文件存在、JSON 可解析、`unit.name/version` 与计划一致、逐表记录数与每条记录版本逐一核对），再区分「已由属主打开」「打开进行中」「仅归档可读」；只有介质真的缺失才保留 `STORAGE_OWNER_UNAVAILABLE`，损坏、身份不符和版本漂移分别报 `STORAGE_DATA_INVALID`、`STORAGE_UNIT_IDENTITY_MISMATCH`、`STORAGE_VERSION_UNSUPPORTED`。
+- 修正存储域识别：此前把 `home-data/storages/**/*.json` 中任何带 `version`+`value` 的文件都当成域，`cost-meter/ledger.json.details-cache/*.json` 因此被误报成 `cost-meter` v2 关键域——一个永远不可能被打开的幻影域。现在只承认文档化的三种介质形态（顶层 `unit` 头、顶层 `{version,value}` 旧格式、带 `global.json` 的 per-record 目录）；插件私有缓存与账本仍全量入档，但不再参与关键域门禁。真实归档的域数量由「6 个（含 1 个幻影）」变为 7 个（5 个关键 + 2 个 `session_projcache*` 非关键）。
+- `run-regressions.mjs` 的清单改为单一声明表（`test/regression-manifest.mjs`）：补登记 `cold-target-path-test.mjs`、`cold-retention-test.mjs`、`cold-migration-native.mjs`，并登记既有的 `appearance-controls-test.ps1`、`cold-paint-log-test.ps1`、`final-layout-test.ps1`；新增 `v075-regression-manifest.mjs` 证明「新增未登记文件」「登记文件消失」都会被拒绝。清单守卫或 DSH 未关闭导致的失败也会写出 `result.json`（`UNCLASSIFIED_TEST_ENTRY` / `MISSING_TEST_ENTRY` / `DSH_MUST_BE_CLOSED`），不再只打印日志。
+- 浅色主题主按钮（`Accent` + 白字）实测对比度 4.33 未达 WCAG AA 4.5。主色由 `#4D6BFE` 调整为同色系 `#4664F0`（对比度 4.86，RGB 和 410 ≥ 220，仍是明确的蓝色而非深色块），冷备份助手与两个 WPF 助手同步；阈值未下调。深色主题保持原值。
+- `restore-view-test.ps1` 不再依赖上一次私有验收留下的 `acceptance-state.json`：新增 `test/make-restore-fixture.mjs`，用产品自己的 `createPrivateBackup` 在本次测试的独立目录里生成格式 2 夹具（必须由 Desktop 运行时生成，ABI 才匹配），测试结束在 `finally` 中删除；显式 `DSH_PACKER_LEGACY_FIXTURE` 仍可覆盖。定位与清理都由测试自己负责，不读真实 Profile。
+- 修复两个独立助手在 Windows PowerShell 5.1 上的真实启动缺陷：`ProcessStartInfo.EnvironmentVariables` 首次读取可能返回 `$null`，随后才实例化，导致点击「检查备份」/「开始恢复」时抛 `Cannot index into a null array`。`restore-assistant.ps1` 与 `migrate-assistant.ps1` 都改为先取一次、为空再取一次，然后只追加 `ELECTRON_RUN_AS_NODE`/`TEMP`/`TMP`，保留继承环境。
+- native/probe 测试（`cold-native-test`、`cold-migration-native`、`host-probe-native`、`host-probe-cim`）在 DSH 完全正常退出后运行；未关闭时清单会以 `DSH_MUST_BE_CLOSED` 立即失败并写明原因，不靠延长超时掩盖。超时只按各测试真实工作量设定（冷备 10 分钟、probe 6 分钟、其余 4 分钟）。
+- 不改变 recovery/2、/3、/4 归档格式、容量限制、事务、verify/commit 门禁与依赖契约；不放宽任何关键数据检查。
+
 ## 0.7.4 — 2026-11-17
 
 - 修复 Windows/NTFS 上扫描阶段误报 `PACKAGE_LINK_CYCLE`、备份直接失败且不生成 ZIP：目录祖先去重原先用 Number 型 `dev:ino` 身份，NTFS 64 位文件编号超过 2^53 后 JS Number 不再精确，相邻的父子目录会被读成同一个编号。现由 `identityExact()`（bigint `lstat`）提供精确编号，只在祖先栈比较中使用；`identity()` 仍用于同一路径/同一句柄的前后比对。

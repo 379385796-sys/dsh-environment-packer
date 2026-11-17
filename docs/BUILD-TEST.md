@@ -1,6 +1,6 @@
 # Build and test
 
-> **Current source: v0.7.4.** The `0.5.0`, v0.6.2 and v0.6.3 sections below are historical build records for those releases; the same isolated-workspace rules apply. Historical artefact hashes are deliberately kept unchanged.
+> **Current source: v0.7.5.** The `0.5.0`, v0.6.2 and v0.6.3 sections below are historical build records for those releases; the same isolated-workspace rules apply. Historical artefact hashes are deliberately kept unchanged.
 
 No runtime dependency installation or install hooks are required. Use Windows PowerShell 5.1, Node, and the matching DSH Electron runtime. Explicitly set DSH_PACKER_TEST_ROOT, TEMP, TMP and npm_config_cache to directories in the authorized workspace. The pnpm store must also be explicit if pnpm is used; these tests do not install dependencies.
 
@@ -107,3 +107,14 @@ All test roots, ZIPs and staged state were under DSH_PACKER_TEST_ROOT. Final acc
 Set process TEMP/TMP, npm cache, pnpm store, browser profile and DSH_PACKER_TEST_ROOT explicitly in the D: workspace. Added `test/v070-browser-diagnostics.cjs` (seven positive/negative parser/source/read cases) and `test/v070-motion-test.ps1` (settled repaint, reduced motion, both palettes/eight states, bounds). `test/v070-legacy-runtime.cjs` generates an exact-DSH-ABI /2 fixture for WPF integration; set `DSH_PACKER_LEGACY_FIXTURE=wpf-legacy-state.json` when invoking restore-view-test.ps1. A standalone Node /2 fixture must continue to fail on a different Node ABI. The 43-case standalone legacy suite and exact-runtime WPF integration are distinct checks.
 
 Browser QA uses an independent synthetic host and fresh D: Edge profile. Text scaling is not OS DPI certification. Full synthetic /4 verification uses the trusted installed Electron Node with --expose-internals; formal tasks and private archives are excluded.
+
+## v0.7.5 verification environment
+
+The full suite is now 47 formal entries (38 Node + 9 PowerShell). `test/regression-manifest.mjs` is the single manifest; `test/v075-regression-manifest.mjs` fails if a test file is unregistered or a registered file disappears, and `run-regressions.mjs` writes `result.json` even when the manifest is refused or DSH is still running (`UNCLASSIFIED_TEST_ENTRY`, `MISSING_TEST_ENTRY`, `DSH_MUST_BE_CLOSED`).
+
+Run the suite from an NTFS checkout: `test/run-tests.mjs` writes its scratch tree inside the repository and commits ZIPs with hard links, which an exFAT volume rejects with a misleading `EISDIR`. Native and probe entries require every real DSH process to have exited normally; the preflight refuses to start them otherwise. Run the host under a plain vendor Node build: an injected `--require` safety hook can re-encode non-ASCII fixture paths and block the deletes these tests perform, so `NODE_OPTIONS` must be empty for the runner.
+
+`pack-test.mjs` (private acceptance) exercises ACL-protected directories; a tool sandbox that denies `icacls` fails it with `PRIVATE_ACL_FAILED`. Run it with ordinary user permissions. Under Node 22.22.2 on this machine that suite dies with `0xC0000409`; Node 24 (Desktop runtime) and Node 26 both pass. This is an existing runtime limitation, recorded rather than hidden.
+
+The storage-domain verification (`assets/migration-runtime.cjs`) now proves each critical medium before any plugin can open it: missing file/directory → `STORAGE_OWNER_UNAVAILABLE`; unreadable JSON, foreign unit header or wrong record shape → `STORAGE_DATA_INVALID` / `STORAGE_UNIT_IDENTITY_MISMATCH`; version drift → `STORAGE_VERSION_UNSUPPORTED`. A live owner is recorded when it opens the domain (including an open still in flight right after `loader.await()`), and a domain no plugin opened is read once through the target's own JSON backend and recorded as `archived-only` in `verification.json`; it is not treated as data loss.
+

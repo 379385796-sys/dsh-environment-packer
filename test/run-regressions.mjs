@@ -1,23 +1,38 @@
-import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {spawn} from 'node:child_process';
+import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';import {spawn,spawnSync} from 'node:child_process';
 import {prepareGuard,holdGuard} from '../lib/task-guard.js';
+import {nodeEntries,psEntries,classifiedUtilities,requiresDshClosed,auditManifest,testArtifacts} from './regression-manifest.mjs';
 const project=path.resolve(import.meta.dirname,'..'),scratch=process.env.DSH_PACKER_TEST_ROOT;
 if(!scratch||!path.isAbsolute(scratch)||!process.env.TEMP||!process.env.TMP)throw Error('Set explicit workspace DSH_PACKER_TEST_ROOT/TEMP/TMP before regression');
 fs.mkdirSync(scratch,{recursive:true});const gateFile=path.join(scratch,'full-regression.guard');prepareGuard(gateFile);const suiteGate=await holdGuard(gateFile,true);
-try {
-const run=fs.mkdtempSync(path.join(scratch,'full-regression-')),ps=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
-fs.mkdirSync(process.env.DSH_PACKER_EVIDENCE_DIR||path.resolve(project,'../evidence-round2'),{recursive:true});
-const nodeEntries=['v070-browser-diagnostics.cjs','run-tests.mjs','host-test.mjs','target-path-test.mjs','dialog-test.mjs','client-bundle-test.mjs','ui-overview-test.mjs','route-export-test.mjs','recovery-route-test.mjs','tgz-test.mjs','read-failure-test.mjs','pack-test.mjs','smoke-test.mjs','cold-safety-test.mjs','dotnet-zip-test.mjs','cold-recovery-test.mjs','legacy-recovery-test.mjs','cold-component-test.mjs','cold-native-test.mjs','host-peer-test.mjs','host-probe-native-test.mjs','host-probe-cim-test.mjs','migration-dependency-gate.cjs','v062-coverage-chain.cjs','v062-apply-gate.cjs','v062-clean-path.cjs','v062-preference-restore.cjs','v063-source-coverage.cjs','v063-clean-path.cjs','v073-plugin-home.cjs','v074-inode-precision.cjs','v074-chat-import-home.cjs','v074-ps1-encoding.cjs'];
-const entries=[...nodeEntries.map(file=>({file,command:process.execPath,args:[...(file==='host-peer-test.mjs'?['--expose-internals']:[]),path.join(project,'test',file)]})),...['legacy-proof-test.ps1','parse-save-as.ps1','cold-view-test.ps1','v070-motion-test.ps1','result-state-test.ps1','restore-view-test.ps1'].map(file=>({file,command:ps,args:['-NoProfile','-NonInteractive','-STA','-ExecutionPolicy','Bypass','-File',path.join(project,'test',file),...(['legacy-proof-test.ps1','cold-view-test.ps1','v070-motion-test.ps1','result-state-test.ps1','restore-view-test.ps1'].includes(file)?['-TestRoot',scratch]:[])]}))];
-const results=[];
-for(const entry of entries){
- const stdout=path.join(run,entry.file+'.stdout.log'),stderr=path.join(run,entry.file+'.stderr.log'),out=fs.openSync(stdout,'wx'),err=fs.openSync(stderr,'wx'),at=Date.now();
- const child=spawn(entry.command,entry.args,{cwd:project,env:process.env,windowsHide:true,stdio:['ignore',out,err]});fs.closeSync(out);fs.closeSync(err);let timedOut=false;
- const timer=setTimeout(()=>{timedOut=true;child.kill();},entry.file==='cold-native-test.mjs'?600000:entry.file.includes('native-test')?360000:240000);
- const exit=await new Promise(resolve=>{child.once('error',error=>resolve({code:null,error:error.code}));child.once('exit',(code,signal)=>resolve({code,signal}));});clearTimeout(timer);
- const result={entry:entry.file,...exit,timedOut,durationMs:Date.now()-at,status:exit.code===0&&!timedOut?'PASS':'FAIL',stdout,stderr};results.push(result);console.log(result.status+' '+entry.file);
-}
-const classifiedUtilities={'coverage-dump.mjs':'manual production metadata inspection; no automatic real-profile reads','real-readonly.mjs':'manual production metadata inspection','real-pack.mjs':'explicit live offline backup utility, not a regression fixture','make-sample-zip.mjs':'manual archive utility requiring an output path','cold-read-faults.mjs':'covered by read-failure-test compatibility entry','private-acceptance-test.mjs':'covered by pack-test compatibility entry'};
-const all=fs.readdirSync(import.meta.dirname).filter(n=>n.endsWith('.mjs')&&n!=='run-regressions.mjs');const unclassified=all.filter(n=>!nodeEntries.includes(n)&&!classifiedUtilities[n]);if(unclassified.length)throw Error('UNCLASSIFIED_TEST_ENTRY '+unclassified.join(','));
+const ps=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
+const manifestErrors=auditManifest(fs.readdirSync(import.meta.dirname));
 const sourceHashes={};function hashTree(folder){for(const f of fs.readdirSync(path.join(project,folder),{withFileTypes:true})){const file=folder+'/'+f.name;if(f.isDirectory())hashTree(file);else sourceHashes[file]=crypto.createHash('sha256').update(fs.readFileSync(path.join(project,file))).digest('hex');}}for(const folder of ['lib','bin','assets','vendor','test'])hashTree(folder);for(const file of ['client.js','index.js','package.json'])sourceHashes[file]=crypto.createHash('sha256').update(fs.readFileSync(path.join(project,file))).digest('hex');
-const report={status:results.every(x=>x.status==='PASS')?'PASS':'FAIL',run,passed:results.filter(x=>x.status==='PASS').length,total:results.length,results,classifiedUtilities,sourceHashes,syntheticOnly:true,guiHumanAcceptanceSeparate:true};fs.writeFileSync(path.join(run,'result.json'),JSON.stringify(report,null,2));const reportDir=process.env.DSH_PACKER_EVIDENCE_DIR||path.resolve(project,'../evidence-round2');fs.mkdirSync(reportDir,{recursive:true});fs.writeFileSync(path.join(reportDir,'full-regression-latest.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,passed:report.passed,total:report.total,run}));if(report.status!=='PASS')process.exitCode=1;
+const reportDir=process.env.DSH_PACKER_EVIDENCE_DIR||path.resolve(project,'../evidence-round2');fs.mkdirSync(reportDir,{recursive:true});
+const entries=[...nodeEntries.map(e=>({...e,command:process.execPath,args:[...(e.args||[]),path.join(project,'test',e.file)]})),...psEntries.map(e=>({...e,command:ps,args:['-NoProfile','-NonInteractive','-STA','-ExecutionPolicy','Bypass','-File',path.join(project,'test',e.file),...(e.testRoot?['-TestRoot',scratch]:[])]}))];
+// Every failure, including a refused manifest or a live DSH, still produces a
+// machine-readable result.json; the guard is never a silent early exit.
+const finish=(payload,code)=>{const run=payload.run||path.join(scratch,'full-regression-'+Date.now());const results=payload.results||[];const report={status:payload.status,run,passed:results.filter(x=>x.status==='PASS').length,total:results.length,results,error:payload.error||null,detail:payload.detail||null,manifest:{nodeEntries:nodeEntries.map(e=>e.file),powerShellEntries:psEntries.map(e=>e.file),requiresDshClosed,classifiedUtilities,artifactsSeen:testArtifacts(fs.readdirSync(import.meta.dirname))},manifestErrors,sourceHashes,syntheticOnly:true,guiHumanAcceptanceSeparate:true};fs.writeFileSync(path.join(run,'result.json'),JSON.stringify(report,null,2));fs.writeFileSync(path.join(reportDir,'full-regression-latest.json'),JSON.stringify(report,null,2));console.log(JSON.stringify({status:report.status,passed:report.passed,total:report.total,run,error:report.error,detail:report.detail}));if(code)process.exitCode=code;};
+try {
+ if(manifestErrors.length){const run=path.join(scratch,'full-regression-'+Date.now());fs.mkdirSync(run,{recursive:true});finish({status:'FAIL',run,results:[],error:manifestErrors[0].code,detail:manifestErrors[0].detail},1);}
+ else {
+  // Native/probe entries wait for the real Desktop to stop; running them with a
+  // live DSH only produces timeouts. Fail fast and name the real cause instead.
+  if(requiresDshClosed.length){
+   const live=spawnSync(ps,['-NoProfile','-NonInteractive','-Command',"@(Get-Process -Name 'DeepSeek Harness' -ErrorAction SilentlyContinue).Count"],{encoding:'utf8',windowsHide:true,timeout:30000});
+   const count=Number(String(live.stdout||'').trim());
+   if(live.status!==0||!Number.isInteger(count)){const run=path.join(scratch,'full-regression-'+Date.now());fs.mkdirSync(run,{recursive:true});finish({status:'FAIL',run,results:[],error:'DSH_PROCESS_STATE_UNKNOWN'},1);}
+   else if(count>0){const run=path.join(scratch,'full-regression-'+Date.now());fs.mkdirSync(run,{recursive:true});finish({status:'FAIL',run,results:[],error:'DSH_MUST_BE_CLOSED',detail:{runningProcesses:count}},1);}
+  }
+  if(!process.exitCode){
+   const run=fs.mkdtempSync(path.join(scratch,'full-regression-')),results=[];
+   for(const entry of entries){
+    const stdout=path.join(run,entry.file+'.stdout.log'),stderr=path.join(run,entry.file+'.stderr.log'),out=fs.openSync(stdout,'wx'),err=fs.openSync(stderr,'wx'),at=Date.now();
+    const child=spawn(entry.command,entry.args,{cwd:project,env:process.env,windowsHide:true,stdio:['ignore',out,err]});fs.closeSync(out);fs.closeSync(err);let timedOut=false;
+    const timer=setTimeout(()=>{timedOut=true;child.kill();},entry.timeoutMs||240000);
+    const exit=await new Promise(resolve=>{child.once('error',error=>resolve({code:null,error:error.code}));child.once('exit',(code,signal)=>resolve({code,signal}));});clearTimeout(timer);
+    const result={entry:entry.file,command:entry.command===ps?'powershell':path.basename(entry.command),requiresDshClosed:entry.requiresDshClosed===true,...exit,timedOut,durationMs:Date.now()-at,status:exit.code===0&&!timedOut?'PASS':'FAIL',stdout,stderr};results.push(result);console.log(result.status+' '+entry.file);
+   }
+   finish({status:results.every(x=>x.status==='PASS')?'PASS':'FAIL',run,results},results.every(x=>x.status==='PASS')?0:1);
+  }
+ }
 } finally {await suiteGate.release();}

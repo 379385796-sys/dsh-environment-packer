@@ -2,11 +2,11 @@
 
 **Keep a portable backup of the DSH environment you've made your own.**
 
-[![Version 0.7.3](https://img.shields.io/badge/version-0.7.3-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.3)
+[![Version 0.7.5](https://img.shields.io/badge/version-0.7.5-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.5)
 ![Windows x64](https://img.shields.io/badge/platform-Windows_x64-697586)
 [![MIT License](https://img.shields.io/badge/license-MIT-697586)](LICENSE)
 
-[Download v0.7.3](#download-and-install) · [Get started](#back-up-and-restore) · [Documentation](#documentation-and-feedback) · [简体中文](README.md)
+[Download v0.7.5](#download-and-install) · [Get started](#back-up-and-restore) · [Documentation](#documentation-and-feedback) · [简体中文](README.md)
 
 A clean install shouldn't mean rebuilding every setting from memory. Packer brings your selected Profile's plugins, configuration and supported session data into a private offline archive. When you need it, an independent assistant guides recovery into a fresh environment—with clear records of what was saved, what was checked and what needs attention.
 
@@ -19,7 +19,7 @@ A clean install shouldn't mean rebuilding every setting from memory. Packer brin
 - **Open recovery even when DSH won't start.** The complete standalone toolkit works independently, using an installed compatible DSH runtime for checks and recovery.
 - **See a result you can inspect.** Task history, file hashes and explicit coverage or compatibility findings keep the outcome clear.
 
-**New in v0.7.3** — known plugin data directories (`.dsh-paper-reader`, `dsham-move-backup`, `music`) are classified explicitly and restored to the new Home; matching legacy `pendingReview` trees become `pluginData` during read-only planning, while unknown entries stay blocking. [Release notes](docs/RELEASE-0.7.3.md)
+**New in v0.7.5** — four leftovers from the previous quality pass are closed: storage domains are identified from their documented media shape (plugin caches are no longer mistaken for a `cost-meter` domain), and runtime verification now requires both a fully readable medium and a real owner that opened it, so normal lazy loading and uninstalled plugins no longer raise `STORAGE_OWNER_UNAVAILABLE`; the regression manifest registers six existing tests and audits itself; the light primary button contrast rises from 4.33 to 4.86; and the standalone restore test builds and removes its own fixture. [Release notes](docs/RELEASE-0.7.5.md)
 
 ## A look inside
 
@@ -40,13 +40,13 @@ These are real v0.7.0 interfaces captured in empty isolated environments, withou
 
 ## Download and install
 
-Get the files you need from the [v0.7.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.3), then verify their SHA-256 hashes against its checksum list.
+Get the files you need from the [v0.7.5 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.5), then verify their SHA-256 hashes against its checksum list.
 
 | Download | Purpose |
 | --- | --- |
-| [Plugin TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/dsh-environment-packer-0.7.3.tgz) | Install Packer in DSH |
-| [Standalone recovery ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/Packer-v0.7.3-Standalone-Recovery.zip) | Keep the complete extracted folder for independent recovery |
-| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/SHA256SUMS.txt) | Verify your downloads |
+| [Plugin TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/dsh-environment-packer-0.7.5.tgz) | Install Packer in DSH |
+| [Standalone recovery ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/Packer-v0.7.5-Standalone-Recovery.zip) | Keep the complete extracted folder for independent recovery |
+| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/SHA256SUMS.txt) | Verify your downloads |
 
 Save your work and fully quit DSH before installing the TGZ through your Desktop version's official plugin-management workflow. With the CLI configured:
 

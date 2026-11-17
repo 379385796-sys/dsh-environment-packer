@@ -16,7 +16,7 @@
     <SolidColorBrush x:Key="Ink" Color="#17191D"/>
     <SolidColorBrush x:Key="Muted" Color="#717680"/>
     <SolidColorBrush x:Key="Line" Color="#E5E7EB"/>
-    <SolidColorBrush x:Key="Accent" Color="#4D6BFE"/>
+    <SolidColorBrush x:Key="Accent" Color="#4664F0"/>
     <SolidColorBrush x:Key="OnAccent" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="Focus" Color="#5175D6"/>
     <SolidColorBrush x:Key="Success" Color="#28765B"/>

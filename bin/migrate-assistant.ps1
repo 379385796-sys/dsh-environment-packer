@@ -52,7 +52,11 @@ function Start-MigrationOperation([string]$Action){
   $file=Join-Path $script:requestDir ([guid]::NewGuid().ToString('N')+'.json');[IO.File]::WriteAllText($file,($request|ConvertTo-Json -Depth 100),(New-Object Text.UTF8Encoding($false)))
   $info=New-Object Diagnostics.ProcessStartInfo;$info.FileName=$exe;$info.WorkingDirectory=$toolRoot;$info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
   $info.StandardOutputEncoding=New-Object Text.UTF8Encoding($false);$info.StandardErrorEncoding=New-Object Text.UTF8Encoding($false)
-  $info.EnvironmentVariables['ELECTRON_RUN_AS_NODE']='1';$info.EnvironmentVariables['TEMP']=$script:requestDir;$info.EnvironmentVariables['TMP']=$script:requestDir
+  # Same Windows PowerShell 5.1 first-read quirk as restore-assistant.ps1: the
+  # first access can be $null, so read twice before adding the worker switches.
+  $workerEnvironment=$info.EnvironmentVariables
+  if([object]::ReferenceEquals($workerEnvironment,$null)){$workerEnvironment=$info.EnvironmentVariables}
+  $workerEnvironment['ELECTRON_RUN_AS_NODE']='1';$workerEnvironment['TEMP']=$script:requestDir;$workerEnvironment['TMP']=$script:requestDir
   $arguments=@('--expose-internals',(Join-Path $toolRoot 'assets\migration-cli.cjs'),$Action,'--request',$file)
   $info.Arguments=($arguments|ForEach-Object{ConvertTo-PackerProcessArgument ([string]$_)}) -join ' '
   $process=New-Object Diagnostics.Process;$process.StartInfo=$info

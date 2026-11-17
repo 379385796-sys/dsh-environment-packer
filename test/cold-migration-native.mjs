@@ -8,10 +8,22 @@ const options={homeDir:home,profileDir:profile,target:path.join(root,'cold-v4.zi
 const source=`import {startColdTask} from ${JSON.stringify(new URL('../lib/cold-task.js',import.meta.url).href)};try{console.log(JSON.stringify(await startColdTask(${JSON.stringify(options)})));}catch(e){console.error(e.code);process.exitCode=1;}`;
 const child=spawn(runtime,['--expose-internals','--input-type=module','-e',source],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true,stdio:['ignore','pipe','pipe']});let err='';child.stderr.on('data',b=>err+=b);child.stdout.resume();const ended=once(child,'exit');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));async function until(fn,ms=150000){const end=Date.now()+ms;while(Date.now()<end){try{const value=fn();if(value)return value;}catch{}await sleep(100);}throw Error('Cold migration deadline');}
-const dir=await until(()=>{const id=fs.readFileSync(path.join(home,'.packer-cold/active.lock'),'utf8'),d=path.join(home,'.packer-cold',id);return fs.existsSync(path.join(d,'accepted.json'))&&d;});assert.equal((await ended)[0],0,err);
-fs.writeFileSync(path.join(dir,'exit-confirmed.json'),JSON.stringify({id:path.basename(dir)}));const terminal=await until(()=>readRecord(path.join(dir,'terminal.json')));assert.equal(terminal.phase,'success',JSON.stringify(terminal));
+// Report the child's own exit and stderr instead of a bare deadline: a failed
+// handoff must name its real cause.
+async function untilTask(fn,ms=150000){const end=Date.now()+ms;while(Date.now()<end){try{const value=fn();if(value)return value;}catch{}if(child.exitCode!==null)throw Error('COLD_CHILD_EXITED code='+child.exitCode+' stderr='+err.slice(-400));await sleep(100);}throw Error('Cold migration deadline stderr='+err.slice(-400));}
+const dir=await untilTask(()=>{const id=fs.readFileSync(path.join(home,'.packer-cold/active.lock'),'utf8'),d=path.join(home,'.packer-cold',id);return fs.existsSync(path.join(d,'accepted.json'))&&d;});assert.equal((await ended)[0],0,err);
+fs.writeFileSync(path.join(dir,'exit-confirmed.json'),JSON.stringify({id:path.basename(dir)}));
+let terminal;
+try{terminal=await until(()=>readRecord(path.join(dir,'terminal.json')));}
+catch(error){let files=[];try{files=fs.readdirSync(dir)}catch{}throw Error(error.message+' task='+dir+' files='+files.join(',')+' err='+err.slice(-300));}
+assert.equal(terminal.phase,'success',JSON.stringify(terminal));
 const lease=readRecord(path.join(dir,'lease-request.private.json'));assert(lease.files.includes(path.join(memory,'memory.md')));assert(fs.existsSync(path.join(dir,'lease-ready.json')));
+// Wait for the durable result receipt, then close only this synthetic UI:
+// the terminal page stays open until the user closes it (v0.6.1 contract).
+const receipt=await until(()=>readRecord(path.join(dir,'ui-result.json')));
+assert(taskOwners(dir).owners['ui-owner.json'],'terminal UI closed by itself');
+const ui=readRecord(path.join(dir,'ui-owner.json'));process.kill(ui.pid);
 await until(()=>!taskOwners(dir).owners['ui-owner.json'],30000);
 const arc=R.readArchive(options.target);try{assert.equal(arc.manifest.format,R.FORMAT);const f=arc.manifest.files.find(f=>f.path.endsWith('/data/memory.md'));assert(f);assert.equal(arc.zip.get(f.path).toString(),'SYNTHETIC_EXTERNAL_MEMORY');}finally{arc.zip.close();}
-const report={status:'PASS',root,task:dir,format:R.FORMAT,externalSourceReadLease:true,shippedAssistantCoordinatorWorker:true,normalHandoffAndSourceExit:true,sourceLeasesReleased:readRecord(path.join(dir,'ui-result.json')).sourceLeasesReleased};
+const report={status:'PASS',root,task:dir,format:R.FORMAT,externalSourceReadLease:true,shippedAssistantCoordinatorWorker:true,normalHandoffAndSourceExit:true,sourceLeasesReleased:receipt.sourceLeasesReleased};
 fs.writeFileSync(path.join(process.env.DSH_PACKER_TEST_ROOT,'cold-migration-native-result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));

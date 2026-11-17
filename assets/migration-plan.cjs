@@ -45,8 +45,54 @@ function targetLayout(workspace,planId){
   }
   return {workspace,state,home:path.join(state,'home'),profile:path.join(state,'home/profiles/desktop'),agents:path.join(state,'agents'),userData:path.join(state,'electron'),parent,parentIdentity:C.identity(fs.statSync(parent))};
 }
+// A DSH storage unit is one of two documented media shapes:
+//   single      <home>/storages/<name>.json  with {unit:{name,version},global,tables}
+//   legacy      <home>/storages/<name>.json  with {version,value} (pre-unit format)
+//   per-record  <home>/storages/<name>/      with global.json and <table>/<key>.json
+// Everything else below storages/ belongs to a plugin's private data (caches,
+// ledgers, detail snapshots) and is not a storage domain. Treating any nested
+// {version,value} JSON as a domain invented a phantom `cost-meter` v2 unit from
+// the cost-meter details cache, which no runtime owner can ever open.
+const STORAGE_UNIT_NAME=/^[a-z][a-z0-9_]*$/;
+function classifyStorage(files,get,issues){
+  const units=new Map();
+  const add=unit=>{const previous=units.get(unit.name);if(!previous||unit.layout==='per-record'&&previous.layout!=='per-record')units.set(unit.name,unit);};
+  const recordCount=tables=>tables&&typeof tables==='object'&&!Array.isArray(tables)?Object.values(tables).reduce((n,t)=>n+(t&&typeof t==='object'&&!Array.isArray(t)?Object.keys(t).length:0),0):0;
+  for(const f of files){
+    const single=f.path.match(/^home-data\/storages\/([^/]+)\.json$/);
+    if(single){
+      const name=single[1];let j;try{j=JSON.parse(get(f));}catch{j=undefined;}
+      if(j?.unit&&typeof j.unit.name==='string'&&Number.isSafeInteger(j.unit.version)){
+        if(j.unit.name!==name||!STORAGE_UNIT_NAME.test(name))issues.push({code:'STORAGE_UNIT_IDENTITY_MISMATCH',path:f.path,state:'unknown',critical:true});
+        else add({name,version:j.unit.version,layout:'single',records:recordCount(j.tables),source:f.path});
+      }else if(j&&Number.isSafeInteger(j.version)&&Object.hasOwn(j,'value')){
+        add({name,version:j.version,layout:'single-legacy',records:0,source:f.path});
+      }else issues.push({code:'STORAGE_JSON_INVALID',path:f.path,state:'unknown',critical:true});
+      continue;
+    }
+    const nested=f.path.match(/^home-data\/storages\/([^/]+)\/(.+)$/);
+    if(!nested||!STORAGE_UNIT_NAME.test(nested[1]))continue;
+    const name=nested[1],rest=nested[2];
+    if(rest==='global.json'){
+      let j;try{j=JSON.parse(get(f));}catch{j=undefined;}
+      if(!j||!Number.isSafeInteger(j.version)){issues.push({code:'STORAGE_JSON_INVALID',path:f.path,state:'unknown',critical:true});continue;}
+      add({name,version:j.version,layout:'per-record',records:units.get(name)?.records||0,source:nested[1]});
+      continue;
+    }
+    // <table>/<key>.json only; plugin-private trees use names that are not
+    // valid unit/table identifiers and are never parsed as storage records.
+    const record=rest.match(/^([a-z][a-z0-9_]*)\/[^/]+\.json$/);
+    if(!record)continue;
+    let j;try{j=JSON.parse(get(f));}catch{j=undefined;}
+    if(!j||!Number.isSafeInteger(j.version)||!Object.hasOwn(j,'record'))continue;
+    const current=units.get(name);
+    if(current?.layout==='per-record'){current.records++;}
+    else add({name,version:j.version,layout:'per-record',records:1,source:nested[1]});
+  }
+  return [...units.values()].map(u=>({...u,critical:!u.name.startsWith('session_projcache')})).sort((a,b)=>a.name.localeCompare(b.name,'en'));
+}
 async function scanData(arc){
-  const roots=[...arc.manifest.roots],issues=[],datasets=[],skills=[],storage=[],files=arc.manifest.files;
+  const roots=[...arc.manifest.roots],issues=[],datasets=[],skills=[],files=arc.manifest.files;
   // Preserved local source trees are inert data, not environment datasets.
   // Never interpret their .db/.json/.md files as storage, database or skills.
   const sourcePrefixes=(arc.manifest.sourceTrees||[]).map(t=>t.archivePrefix+'/');
@@ -82,17 +128,14 @@ async function scanData(arc){
       const known=A.sqliteHeader(get(arc,f))&&f.path.endsWith('/mnemon.db')&&(arc.manifest.tools||[]).some(t=>t.name==='mnemon');datasets.push({path:f.path,adapter:'sqlite-preserve',state:known?'requires-owner-validation':'unknown',critical:true});if(!known)issues.push({code:'DATABASE_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});
     }
     if(f.path.startsWith('preferences/')){try{const pref=JSON.parse(get(arc,f));if(f.path!=='preferences/dsh-chat-comfort.settings.v1.json'||pref.key!=='dsh-chat-comfort.settings.v1')throw Error();A.knownPreference(pref.value);}catch{issues.push({code:'PREFERENCE_SCHEMA_UNKNOWN',path:f.path,state:'unknown',critical:true});}}
-    if(f.path.startsWith('home-data/storages/')&&f.path.endsWith('.json')){let j;try{j=JSON.parse(get(arc,f));}catch{issues.push({code:'STORAGE_JSON_INVALID',path:f.path,state:'unknown',critical:true});}
-      if(j?.unit&&typeof j.unit.name==='string'&&Number.isSafeInteger(j.unit.version))storage.push({name:j.unit.name,version:j.unit.version,critical:!j.unit.name.startsWith('session_projcache')});
-      else if(j&&Number.isSafeInteger(j.version)&&Object.hasOwn(j,'value')){const name=f.path.slice('home-data/storages/'.length).split('/')[0];storage.push({name,version:j.version,critical:!name.startsWith('session_projcache')});}
-    }
+    if(f.path.startsWith('home-data/storages/'))continue;
     if(f.path==='home-data/settings.yaml')issues.push({code:'LEGACY_SETTINGS_REQUIRE_ADAPTER',path:f.path,state:'unknown',critical:true});
     if((/\/(?:\.agents|\.dsh)\/skills\//.test(f.path)||f.path.startsWith('home-data/skills/'))&&f.path.endsWith('.md')){
       const raw=get(arc,f).toString('utf8'),match=raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);
       if(match){try{const meta=(await A.yaml()).load(match[1]);if(typeof meta.name==='string'&&typeof meta.description==='string')skills.push({path:f.path,name:meta.name,bodySHA256:C.sha(Buffer.from(match[2].trim()))});else throw Error();}catch{issues.push({code:'SKILL_METADATA_INVALID',path:f.path,state:'unknown',critical:true});}}
     }
   }
-  return {roots,datasets,skills,storage:[...new Map(storage.map(s=>[s.name+':'+s.version,s])).values()],issues};
+  return {roots,datasets,skills,storage:classifyStorage(files,f=>get(arc,f),issues),issues};
 }
 async function inspect({zipFile}){
   const arc=R.readArchive(zipFile);try{const data=await scanData(arc);return {format:arc.manifest.format,producerVersion:arc.manifest.producerVersion,archiveIntegrity:{state:'valid',sha256:arc.zip.fingerprint(),files:arc.manifest.files.length,bytes:arc.manifest.files.reduce((n,f)=>n+f.bytes,0)},coverage:arc.manifest.coverage,data,postRestoreUsability:{state:'not-verified'}};}finally{arc.zip.close();}
@@ -159,4 +202,4 @@ function validatePlan(p){
   for(const t of p.pluginData||[]){if(typeof t.name!=='string'||!t.name||t.name==='.'||t.name==='..'||/[\/\\]/.test(t.name)||pluginNames.has(t.name.toLowerCase())||t.to!==path.join(l.home,t.name)||!A.inside(l.home,t.to))C.fail('PLAN_LAYOUT_INVALID');pluginNames.add(t.name.toLowerCase());}
   for(const t of p.pendingReview||[])if(t.to!==path.join(l.state,'pending-review',t.name)||!A.inside(l.state,t.to)||A.inside(l.home,t.to)||pluginNames.has(t.name.toLowerCase()))C.fail('PLAN_LAYOUT_INVALID');
 }
-module.exports={stable,digest,get,hasUnresolvedCritical,packageRecords,compatibility,targetLayout,scanData,inspect,plan,validatePlan};
+module.exports={stable,digest,get,hasUnresolvedCritical,packageRecords,compatibility,targetLayout,classifyStorage,scanData,inspect,plan,validatePlan};

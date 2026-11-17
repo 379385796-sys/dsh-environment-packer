@@ -33,7 +33,12 @@ function Start-RecoveryOperation([string]$Action) {
   $info.FileName=$runtime;$info.WorkingDirectory=$toolRoot;$info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
   $info.StandardOutputEncoding=New-Object Text.UTF8Encoding($false);$info.StandardErrorEncoding=New-Object Text.UTF8Encoding($false)
   $info.Arguments=($arguments | ForEach-Object {ConvertTo-PackerProcessArgument ([string]$_)}) -join ' '
-  $info.EnvironmentVariables['ELECTRON_RUN_AS_NODE']='1'
+  # Windows PowerShell 5.1 can answer the first EnvironmentVariables read with
+  # $null and materialize the inherited copy on the next read. Read twice so the
+  # worker still inherits the parent environment and only adds this one switch.
+  $workerEnvironment=$info.EnvironmentVariables
+  if([object]::ReferenceEquals($workerEnvironment,$null)){$workerEnvironment=$info.EnvironmentVariables}
+  $workerEnvironment['ELECTRON_RUN_AS_NODE']='1'
   $process=New-Object Diagnostics.Process;$process.StartInfo=$info
   $started=$false
   try{

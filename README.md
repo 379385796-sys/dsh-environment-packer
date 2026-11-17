@@ -2,11 +2,11 @@
 
 **环境恢复包 · 给熟悉的 DSH 环境，留一份可以带走的备份。**
 
-[![版本 0.7.3](https://img.shields.io/badge/version-0.7.3-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.3)
+[![版本 0.7.5](https://img.shields.io/badge/version-0.7.5-4D6BFE)](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.5)
 ![Windows x64](https://img.shields.io/badge/platform-Windows_x64-697586)
 [![MIT License](https://img.shields.io/badge/license-MIT-697586)](LICENSE)
 
-[下载 v0.7.3](#下载与安装) · [快速上手](#备份与恢复) · [完整文档](#文档与反馈) · [English](README.en.md)
+[下载 v0.7.5](#下载与安装) · [快速上手](#备份与恢复) · [完整文档](#文档与反馈) · [English](README.en.md)
 
 升级前留一份备份，重装或迁移时少一些从头配置。Packer 将当前 Profile 的插件、设置和支持的会话数据收进私人离线归档，再由独立助手引导你在新环境恢复。保存了什么、检查到哪一步、哪些问题需要处理，都有清楚的结果可查。
 
@@ -19,7 +19,7 @@
 - **DSH 无法启动时也有入口**：完整独立恢复工具可单独打开，使用已安装的兼容 DSH 检查与恢复。
 - **结果可以核对**：查看任务记录、文件摘要与检查结论；关键缺口或兼容问题会明确显示。
 
-**v0.7.3 亮点**是把 `.dsh-paper-reader`、`dsham-move-backup`、`music` 三个已知插件数据目录显式归类并映射回新 Home；旧归档的同类 `pendingReview` 在只读规划中解析为 `pluginData`，未知目录仍保持阻断。 [本版说明](docs/RELEASE-0.7.3.md)
+**v0.7.5 亮点**是收口上轮四项遗留问题：修正存储域识别（插件私有缓存不再被误当成 `cost-meter` 域），运行时验证改为「介质逐条可读 + 真实打开的属主」双证据，正常懒加载与未安装插件不再误报 `STORAGE_OWNER_UNAVAILABLE`；回归清单补齐 6 个既有测试并自检；浅色主按钮对比度从 4.33 提到 4.86；独立恢复助手的测试夹具自建并清理。 [本版说明](docs/RELEASE-0.7.5.md)
 
 ## 看看界面
 
@@ -40,13 +40,13 @@
 
 ## 下载与安装
 
-从 [v0.7.3 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.3) 下载所需文件，并用同页的校验清单核对 SHA-256：
+从 [v0.7.5 Release](https://github.com/379385796-sys/dsh-environment-packer/releases/tag/v0.7.5) 下载所需文件，并用同页的校验清单核对 SHA-256：
 
 | 下载 | 用途 |
 | --- | --- |
-| [插件 TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/dsh-environment-packer-0.7.3.tgz) | 安装到 DSH |
-| [独立恢复工具 ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/Packer-v0.7.3-Standalone-Recovery.zip) | 在需要恢复时单独使用；请保留完整目录 |
-| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.3/SHA256SUMS.txt) | 核对下载文件 |
+| [插件 TGZ](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/dsh-environment-packer-0.7.5.tgz) | 安装到 DSH |
+| [独立恢复工具 ZIP](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/Packer-v0.7.5-Standalone-Recovery.zip) | 在需要恢复时单独使用；请保留完整目录 |
+| [SHA256SUMS.txt](https://github.com/379385796-sys/dsh-environment-packer/releases/download/v0.7.5/SHA256SUMS.txt) | 核对下载文件 |
 
 保存工作并正常退出全部 DSH 实例后，通过当前 Desktop 的官方插件管理流程安装 TGZ。已配置 CLI 时可用：
 

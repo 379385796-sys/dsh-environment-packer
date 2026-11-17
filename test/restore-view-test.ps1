@@ -44,8 +44,25 @@ try{
   if((ConvertTo-PackerProcessArgument 'D:\space path\') -ne '"D:\space path\\"' -or (ConvertTo-PackerProcessArgument 'a"b') -ne '"a\"b"'){throw 'Worker quoting failed'}
   $checks.Add('Worker argv preserves spaces, quotes and trailing slashes')
 }finally{$view.form.Close()}
-$fixtureName=if($env:DSH_PACKER_LEGACY_FIXTURE){$env:DSH_PACKER_LEGACY_FIXTURE}else{'acceptance-state.json'}
-$state=Get-Content -LiteralPath (Join-Path $TestRoot $fixtureName) -Raw -Encoding UTF8 | ConvertFrom-Json
+$fixtureName=$env:DSH_PACKER_LEGACY_FIXTURE;$fixtureDir=$null
+try{
+if($fixtureName){
+  # Explicit external fixture (for example a /2 sample built by another suite).
+  $state=Get-Content -LiteralPath (Join-Path $TestRoot $fixtureName) -Raw -Encoding UTF8 | ConvertFrom-Json
+}else{
+  # Self-contained fixture: the product's own private backup produces the /2 ZIP
+  # in a fresh directory, so this test never depends on a previous run's leftovers
+  # and never reads the real Profile. The directory is removed in the finally block.
+  $fixtureDir=Join-Path $TestRoot ('restore-view-fixture-'+[guid]::NewGuid().ToString('N'))
+  $fixtureRuntime='D:\DeepSeek Harness\DeepSeek Harness.exe'
+  if(-not (Test-Path -LiteralPath $fixtureRuntime -PathType Leaf)){throw 'FIXTURE_RUNTIME_MISSING'}
+  $previousRunAsNode=$env:ELECTRON_RUN_AS_NODE;$env:ELECTRON_RUN_AS_NODE='1'
+  try{& $fixtureRuntime --expose-internals (Join-Path $PSScriptRoot 'make-restore-fixture.mjs') $fixtureDir | Out-Null}
+  finally{if($null -eq $previousRunAsNode){Remove-Item Env:\ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue}else{$env:ELECTRON_RUN_AS_NODE=$previousRunAsNode}}
+  if($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $fixtureDir 'fixture-state.json') -PathType Leaf)){throw 'FIXTURE_GENERATION_FAILED'}
+  $state=Get-Content -LiteralPath (Join-Path $fixtureDir 'fixture-state.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+  $checks.Add('Fixture created from the product backup in a fresh directory; no leftover or real-Profile dependency')
+}
 $driver=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\bin\restore-assistant.ps1') -Raw -Encoding UTF8
 $entry=$driver.IndexOf('try{$timer.Start();Update-Gate;[void]$view.form.ShowDialog()}');if($entry -lt 0){throw 'Controller entry changed'}
 $bin=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\bin'))
@@ -81,3 +98,6 @@ try{
   @{status='PASS';ui='WPF/XAML';checks=@($checks);controllerAndWorker=$true;humanDesktopAcceptance=$false} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $output 'restore-view-results.json') -Encoding UTF8
   Write-Output "PASS WPF view/controller: $($checks.Count) focused checks"
 }finally{$timer.Stop();$script:busy=$false;$view.form.Close()}
+}finally{
+  if($fixtureDir -and (Test-Path -LiteralPath $fixtureDir)){Remove-Item -LiteralPath $fixtureDir -Recurse -Force -ErrorAction Stop}
+}

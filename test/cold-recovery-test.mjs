@@ -78,4 +78,4 @@ await test('ZIP success; commit reporting failure preserves a verified ZIP and r
   assert.throws(()=>createPrivateBackup({...opts,target:committed}),{code:'TARGET_EXISTS'});
   assert.throws(()=>createPrivateBackup({...opts,target:path.join(base,'unconfirmed-gates.zip'),sourceQuiescent:false}),{code:'QUIESCENT_CONFIRMATION_REQUIRED'});
 });
-fs.writeFileSync(path.resolve('../evidence/cold-recovery-results.json'),JSON.stringify({passed:results.length,results,base},null,2));
+const evidenceDir=process.env.DSH_PACKER_EVIDENCE_DIR||path.resolve('../evidence');fs.mkdirSync(evidenceDir,{recursive:true});fs.writeFileSync(path.join(evidenceDir,'cold-recovery-results.json'),JSON.stringify({passed:results.length,results,base},null,2));

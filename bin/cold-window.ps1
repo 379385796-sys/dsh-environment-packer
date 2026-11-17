@@ -1,4 +1,4 @@
-﻿param([Parameter(Mandatory=$true)][string]$TaskDirectory)
+param([Parameter(Mandatory=$true)][string]$TaskDirectory)
 $ErrorActionPreference = 'Stop'
 $script:finished = $false
 $script:worker = $null
@@ -57,6 +57,11 @@ function Complete-AssistantView([string]$Outcome,[int]$Delay,[string]$Code) {
   }elseif($Outcome -eq 'cancelled'){
     Update-PackerAssistantState $view @{phase='cancelled';files=$state.files;error=$Code;target=$job.target;at=$completedAt;zipPresent=$zipPresent}
     $view.title.Text='任务已取消';$view.subtitle.Text='写入与收尾已经结束；未生成有效 ZIP。'
+  }elseif($Outcome -eq 'success'){
+    # The polling loop only paints success after the worker exits, so the last
+    # painted state can still be 'unknown'. Repaint the whole card from the
+    # confirmed terminal record; the record itself is already durable above.
+    Update-PackerAssistantState $view @{phase='success';files=$state.files;bytes=$state.bytes;sha256=$state.sha256;coverage=$state.coverage;dependencyIssues=$state.dependencyIssues;target=$job.target;at=$completedAt;zipPresent=$zipPresent;error=''}
   }
   # D-09: every terminal outcome must report record persistence truthfully.
   if($durable){

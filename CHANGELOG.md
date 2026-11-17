@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.4 — 2026-11-17
+
+- 修复 Windows/NTFS 上扫描阶段误报 `PACKAGE_LINK_CYCLE`、备份直接失败且不生成 ZIP：目录祖先去重原先用 Number 型 `dev:ino` 身份，NTFS 64 位文件编号超过 2^53 后 JS Number 不再精确，相邻的父子目录会被读成同一个编号。现由 `identityExact()`（bigint `lstat`）提供精确编号，只在祖先栈比较中使用；`identity()` 仍用于同一路径/同一句柄的前后比对。
+- 本机实测的碰撞：`node_modules/d3-sankey/node_modules/internmap` 与其 `src` 子目录的文件编号只差 1（`…048750` / `…048751`），Number 形式同为 `9288674231748432`；全部被扫的 3988 个目录里 2038 个编号超过 2^53、8 组 Number 碰撞（17 个目录）。二者都是普通目录，不是联接点或符号链接。
+- 安全语义与归档格式不变：真实循环（包根链接指回祖先）仍报 `PACKAGE_LINK_CYCLE`；包内链接仍 `SOURCE_LINK_REFUSED`；经重解析点到达的 Profile 仍 `REPARSE_REFUSED`；包根链接仍物化。recovery/2、/3、/4 格式、清单字段、verify/commit 门禁与容量限制均未改动。
+- 新增定向测试 `v074-inode-precision.cjs`（7 checks，合成数据）：折叠编号不再误报、真循环仍拒、合法包链接仍物化、包内链接与链接根仍拒、整树目录枚举完整；同一测试在 0.7.3 上以 `PACKAGE_LINK_CYCLE` 失败，可长期充当回归护栏。详见 [v0.7.4 说明](docs/RELEASE-0.7.4.md)。
+- `dsh-chat-import` 的会话扫描索引（`~/.dsh/dsh-chat-import/scan-cache.json`）不再被当作未知 Home 数据：它以 `scan-cache-v1` 标记（`version` 整数 + `bookmarks` 按来源格式分组且条目含 `entries[]`）证明归属，作为 `captured-plugin-data` 全量采集并记录 owner；真实备份因此不再出现 `HOME_ITEM_UNCLASSIFIED` critical、`recoveryBlocked` 归零。同名但无标记或标记损坏的目录仍进入 `pendingReview` 并保持阻断。
+- 独立助手成功路径补上结果卡片重绘：此前轮询循环只在 worker 退出前渲染 `unknown`，`Complete-AssistantView` 的成功分支从不调用 `Update-PackerAssistantState`，导致 ZIP 已成功却停在第 4 步“完整性校验”、显示“结果未确认”。现在成功终态会用已确认的终态记录重绘整张卡片（阶段 5 点亮、结果卡片显示已完成）。
+- 新增定向测试 `v074-chat-import-home.cjs`（8 checks，合成数据）：真实标记被归类并采集、无标记/版本错误/`bookmarks` 为数组/条目缺 `entries` 四种情形均仍阻断；未修复代码在同一测试上以断言失败告终。
+
 ## 0.7.3 — 2026-11-12
 
 - 修复已知插件 Home 数据被误判：`.dsh-paper-reader`（`@ggboy123/dsh-paper-reader`）、`dsham-move-backup`（`@michengai/dsh-archive-manager`）与 `music`（按 `settings.roots` + `stats.version:2` 识别）现在作为 `captured-plugin-data` 采集，清单新增可选 `pluginHomes`，记录归属、证据、文件数与字节数；新备份不再因这三项报 `HOME_ITEM_UNCLASSIFIED`。

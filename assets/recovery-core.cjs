@@ -57,6 +57,14 @@ function probeTarget(directory) {
 const table = Array.from({ length: 256 }, (_, n) => { let c = n; for (let i=0;i<8;i++) c=c&1 ? 0xedb88320^(c>>>1) : c>>>1; return c>>>0; });
 function crc(data) { let c=0xffffffff; for (const b of data) c=table[(c^b)&255]^(c>>>8); return (c^0xffffffff)>>>0; }
 function identity(st) { return `${st.dev}:${st.ino}`; }
+// NTFS file ids are 64-bit and routinely exceed 2^53, where a double stops being
+// lossless: two neighbouring ids then read as the same Number. identity() is only
+// safe to compare one object against itself. Any check that compares two different
+// objects (an ancestor stack, a seen set) must use an exact bigint identity.
+function identityExact(target) {
+  const st = fs.lstatSync(target, { bigint: true });
+  return `${st.dev}:${st.ino}`;
+}
 function readStable(file) {
   const before = fs.lstatSync(file);
   if (!before.isFile() || before.isSymbolicLink() || before.size > MAX_FILE) fail('SOURCE_TYPE_OR_SIZE');
@@ -153,4 +161,4 @@ function validateManifest(zip) {
   for(const f of m.files) { const b=zip.get(f.path); if(b.length!==f.bytes||sha(b)!==f.sha256) fail('HASH_MISMATCH'); }
   return m;
 }
-module.exports={MAX_FILE,MAX_TOTAL,MAX_ENTRIES,fail,sha,safeName,noLinks,exists,privateAccess,probeTarget,identity,readStable,ZipWriter,openZip,validateManifest};
+module.exports={MAX_FILE,MAX_TOTAL,MAX_ENTRIES,fail,sha,safeName,noLinks,exists,privateAccess,probeTarget,identity,identityExact,readStable,ZipWriter,openZip,validateManifest};

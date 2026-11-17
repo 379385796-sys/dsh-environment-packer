@@ -47,7 +47,8 @@ const USER_HOME=new Set(['storages','sessions','attachments','memory','skills','
 const KNOWN_PLUGIN_HOME=new Map([
   ['.dsh-paper-reader',{owner:'@ggboy123/dsh-paper-reader',evidence:'directory-name'}],
   ['dsham-move-backup',{owner:'@michengai/dsh-archive-manager',evidence:'directory-name'}],
-  ['music',{owner:null,evidence:'music-settings-v2'}]
+  ['music',{owner:null,evidence:'music-settings-v2'}],
+  ['dsh-chat-import',{owner:'dsh-chat-import',evidence:'scan-cache-v1'}]
 ]);
 function jsonObject(bytes){try{const value=JSON.parse(bytes.toString('utf8'));return value&&typeof value==='object'&&!Array.isArray(value)?value:null;}catch{return null;}}
 // `read(relative)` returns a Buffer for the marker file, or null when absent.
@@ -58,6 +59,18 @@ function classifyPluginHome(name,read){
     const settings=jsonObject(read('settings.json')),stats=jsonObject(read('stats.json'));
     if(!settings||!Array.isArray(settings.roots))return null;
     if(!stats||stats.version!==2||!stats.tracks||typeof stats.tracks!=='object'||Array.isArray(stats.tracks))return null;
+  }
+  // dsh-chat-import keeps its transcript scan index here: version plus one
+  // bookmark group per source format, each mapping a source file to its entries.
+  // The marker is that documented shape, so a same-named directory owned by
+  // anything else still goes to pending review.
+  else if(record.evidence==='scan-cache-v1'){
+    const cache=jsonObject(read('scan-cache.json'));if(!cache)return null;
+    const bookmarks=cache.bookmarks;
+    if(!Number.isInteger(cache.version)||cache.version<1)return null;
+    if(!bookmarks||typeof bookmarks!=='object'||Array.isArray(bookmarks))return null;
+    const shaped=Object.values(bookmarks).some(group=>group&&typeof group==='object'&&!Array.isArray(group)&&Object.values(group).some(item=>item&&typeof item==='object'&&Array.isArray(item.entries)));
+    if(!shaped)return null;
   }
   return record;
 }

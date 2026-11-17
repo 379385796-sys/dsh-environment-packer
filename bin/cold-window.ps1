@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$TaskDirectory)
+﻿param([Parameter(Mandatory=$true)][string]$TaskDirectory)
 $ErrorActionPreference = 'Stop'
 $script:finished = $false
 $script:worker = $null
